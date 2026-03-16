@@ -57,17 +57,31 @@ class ConfigureRequest(BaseModel):
     connections: list[ConnectionPayload]
 
 
-from synapse.api.nodes.signal_config_pb2 import SignalConfig
 from synapse.client.nodes.spike_detector import ThresholderConfig
 
-_NODE_FACTORIES = {
-    "broadband_source": lambda p: syn.BroadbandSource(
+def _make_broadband_source(p: dict):
+    num_channels = int(p.get("num_channels", 8))
+    channels = [
+        syn.Channel(id=ch, electrode_id=ch * 2, reference_id=ch * 2 + 1)
+        for ch in range(num_channels)
+    ]
+    return syn.BroadbandSource(
         peripheral_id=0,
         bit_width=int(p.get("bit_depth", 12)),
         sample_rate_hz=int(p.get("sample_rate_hz", 30000)),
         gain=1.0,
-        signal=SignalConfig(),
-    ),
+        signal=syn.SignalConfig(
+            electrode=syn.ElectrodeConfig(
+                channels=channels,
+                low_cutoff_hz=300.0,
+                high_cutoff_hz=6000.0,
+            )
+        ),
+    )
+
+
+_NODE_FACTORIES = {
+    "broadband_source": _make_broadband_source,
     "spectral_filter": lambda p: syn.SpectralFilter(
         method=str(p.get("filter_type", "butterworth")),
         low_cutoff_hz=float(p.get("low_cutoff_hz", 300)),
@@ -303,53 +317,78 @@ def _decode_frame(raw: bytes, message_type: str) -> dict | None:
 @app.websocket("/api/devices/stream")
 async def stream_tap(ws: WebSocket, uri: str, tap_name: str):
     """Stream tap data over WebSocket."""
+    import zmq
+
     await ws.accept()
 
-    tap = Tap(uri)
+    # List taps to find the endpoint and message type
+    tap_client = Tap(uri)
+    taps = await asyncio.to_thread(tap_client.list_taps)
+    selected = None
+    for t in taps:
+        if t.name == tap_name:
+            selected = t
+            break
 
-    # Connect to the tap in a thread (ZMQ setup)
-    connected = await asyncio.to_thread(tap.connect, tap_name)
-    if not connected:
-        await ws.send_json({"error": f"Failed to connect to tap '{tap_name}'"})
+    if not selected:
+        await ws.send_json({"error": f"Tap '{tap_name}' not found"})
         await ws.close()
         return
 
-    # Find the message type for this tap
-    taps = await asyncio.to_thread(tap.list_taps)
-    message_type = "unknown"
-    for t in taps:
-        if t.name == tap_name:
-            message_type = t.message_type
-            break
+    endpoint = selected.endpoint
+    message_type = selected.message_type
+
+    # Connect ZMQ directly using the endpoint as reported by the device
+    # (don't let Tap.connect() substitute the host)
+    zmq_ctx = zmq.Context()
+    zmq_sock = zmq_ctx.socket(zmq.SUB)
+    zmq_sock.setsockopt(zmq.RCVBUF, 16 * 1024 * 1024)
+    zmq_sock.setsockopt(zmq.RCVHWM, 10000)
+    zmq_sock.setsockopt(zmq.SUBSCRIBE, b"")
+    zmq_sock.setsockopt(zmq.RCVTIMEO, 100)
+
+    try:
+        zmq_sock.connect(endpoint)
+    except zmq.ZMQError as e:
+        await ws.send_json({"error": f"Failed to connect to ZMQ endpoint: {e}"})
+        await ws.close()
+        zmq_sock.close()
+        zmq_ctx.term()
+        return
 
     await ws.send_json({"status": "connected", "tap_name": tap_name, "message_type": message_type})
 
     stop_event = asyncio.Event()
 
-    async def _read_loop():
-        """Read from ZMQ tap in a thread and forward to WebSocket."""
-        batch_interval = 1.0 / 30  # ~30 updates/sec to browser
-        while not stop_event.is_set():
-            frames = []
-            deadline = asyncio.get_event_loop().time() + batch_interval
+    def _read_batch() -> list[bytes]:
+        """Read up to N messages from ZMQ without blocking the event loop."""
+        msgs = []
+        for _ in range(500):
+            try:
+                msgs.append(zmq_sock.recv(zmq.DONTWAIT))
+            except zmq.Again:
+                break
+        return msgs
 
-            while asyncio.get_event_loop().time() < deadline and not stop_event.is_set():
-                raw = await asyncio.to_thread(tap.read, 50)
-                if raw is not None:
+    async def _read_loop():
+        batch_interval = 1.0 / 30
+        while not stop_event.is_set():
+            raw_msgs = await asyncio.to_thread(_read_batch)
+            if raw_msgs:
+                frames = []
+                for raw in raw_msgs:
                     decoded = _decode_frame(raw, message_type)
                     if decoded:
                         frames.append(decoded)
-                else:
-                    await asyncio.sleep(0.01)
-
-            if frames and not stop_event.is_set():
-                try:
-                    await ws.send_text(json.dumps({"frames": frames}))
-                except Exception:
-                    break
+                if frames:
+                    try:
+                        await ws.send_text(json.dumps({"frames": frames}))
+                    except Exception:
+                        break
+            else:
+                await asyncio.sleep(batch_interval)
 
     async def _recv_loop():
-        """Listen for client close / commands."""
         try:
             while True:
                 await ws.receive_text()
@@ -361,7 +400,8 @@ async def stream_tap(ws: WebSocket, uri: str, tap_name: str):
     try:
         await asyncio.gather(_read_loop(), _recv_loop())
     finally:
-        await asyncio.to_thread(tap.disconnect)
+        zmq_sock.close()
+        zmq_ctx.term()
 
 
 @app.on_event("shutdown")

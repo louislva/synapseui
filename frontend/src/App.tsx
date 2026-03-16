@@ -1,13 +1,11 @@
-import { useState, useRef, useEffect } from "react"
+import { useState, useCallback, useMemo } from "react"
 import { ReactFlowProvider } from "@xyflow/react"
 import {
-  ChevronDown,
   Cpu,
   FileSliders,
   Loader2,
   Play,
-  Plus,
-  RefreshCw,
+  Radio,
   Square,
   Upload,
   X,
@@ -21,14 +19,22 @@ import { ConfigsSidebar } from "./components/ConfigsSidebar"
 import { DevicesSidebar } from "./components/DevicesSidebar"
 import { DeviceDropdown } from "./components/DeviceDropdown"
 import { ParameterPanel } from "./components/ParameterPanel"
+import { StreamPanel } from "./components/StreamPanel"
 import { serializeGraph, configHash } from "./lib/serialize"
 import { Button } from "./components/ui/button"
 
 function App() {
   const [configsOpen, setConfigsOpen] = useState(true)
   const [devicesOpen, setDevicesOpen] = useState(false)
+  const [streamOpen, setStreamOpen] = useState(false)
   const [deploying, setDeploying] = useState(false)
   const [startingStopping, setStartingStopping] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const showError = useCallback((msg: string) => {
+    setError(msg)
+    setTimeout(() => setError(null), 5000)
+  }, [])
   const {
     devices,
     status,
@@ -44,14 +50,13 @@ function App() {
   const activeConfigId = useConfigStore((s) => s.activeConfigId)
   const saveActiveConfig = useConfigStore((s) => s.saveActiveConfig)
   const selectedUri = useDeviceStore((s) => s.selectedUri)
-  const selectDevice = useDeviceStore((s) => s.selectDevice)
   const deployedHashes = useDeviceStore((s) => s.deployedHashes)
   const setDeployedHash = useDeviceStore((s) => s.setDeployedHash)
 
   const selectedDevice = devices.find((d) => d.uri === selectedUri)
   const isRunning = selectedDevice?.status === "Running"
 
-  const currentHash = configHash(nodes, edges)
+  const currentHash = useMemo(() => configHash(nodes, edges), [nodes, edges])
   const isDeployed =
     selectedUri != null && deployedHashes[selectedUri] === currentHash
   const canDeploy =
@@ -73,12 +78,12 @@ function App() {
       )
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        console.error("Deploy failed:", err)
+        showError(`Deploy failed: ${err.detail || res.statusText}`)
         return
       }
       setDeployedHash(selectedUri, currentHash)
     } catch (e) {
-      console.error("Deploy failed:", e)
+      showError(`Deploy failed: ${e instanceof Error ? e.message : "Network error"}`)
     } finally {
       setDeploying(false)
     }
@@ -95,13 +100,13 @@ function App() {
       )
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        console.error(`${action} failed:`, err)
+        showError(`${action.charAt(0).toUpperCase() + action.slice(1)} failed: ${err.detail || res.statusText}`)
         return
       }
       const data = await res.json()
       updateDeviceStatus(selectedUri, data.status)
     } catch (e) {
-      console.error("Start/stop failed:", e)
+      showError(`${isRunning ? "Stop" : "Start"} failed: ${e instanceof Error ? e.message : "Network error"}`)
     } finally {
       setStartingStopping(false)
     }
@@ -112,7 +117,6 @@ function App() {
       <div className="flex flex-col h-screen">
         {/* Toolbar */}
         <div className="flex items-center h-11 px-3 gap-2 border-b border-border bg-background">
-          {/* Left: Configs toggle */}
           <Button
             variant="ghost"
             size="sm"
@@ -167,9 +171,18 @@ function App() {
             {isRunning ? "Stop" : "Start"}
           </Button>
 
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setStreamOpen(!streamOpen)}
+            className={streamOpen ? "bg-muted" : "text-muted-foreground"}
+          >
+            <Radio className="size-3.5" />
+            Stream
+          </Button>
+
           <div className="flex-1" />
 
-          {/* Right: Devices toggle */}
           <Button
             variant="ghost"
             size="sm"
@@ -181,15 +194,27 @@ function App() {
           </Button>
         </div>
 
+        {/* Error banner */}
+        {error && (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500/15 border-b border-red-500/30 text-red-400 text-sm">
+            <span className="flex-1">{error}</span>
+            <button onClick={() => setError(null)} className="hover:text-red-300 cursor-pointer">
+              <X className="size-3.5" />
+            </button>
+          </div>
+        )}
+
         {/* Main area */}
         <div className="flex flex-1 overflow-hidden">
-          {/* Configs sidebar (left) */}
           {configsOpen && <ConfigsSidebar />}
-
-          {/* Node editor canvas */}
-          <NodeEditor />
-
-          {/* Parameter panel (right, when node selected) */}
+          <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+            <div className="relative flex-1 min-h-0">
+              <NodeEditor />
+            </div>
+            {streamOpen && (
+              <StreamPanel onClose={() => setStreamOpen(false)} />
+            )}
+          </div>
           {selectedNodeId && <ParameterPanel />}
           {devicesOpen && (
             <DevicesSidebar

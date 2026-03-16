@@ -76,7 +76,7 @@ export function NodeEditor() {
 
   if (!activeConfigId) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="absolute inset-0 flex items-center justify-center">
         <div className="text-center">
           <p className="text-sm text-muted-foreground mb-3">
             No config selected.
@@ -94,7 +94,7 @@ export function NodeEditor() {
   }
 
   return (
-    <div className="relative flex-1">
+    <div className="absolute inset-0">
       <ReactFlow
         nodes={nodes}
         edges={edges}
