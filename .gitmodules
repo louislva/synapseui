@@ -1,0 +1,4 @@
+[submodule "synapse-python"]
+	path = synapse-python
+	url = https://github.com/louislva/synapse-python.git
+	branch = synapse-ui
