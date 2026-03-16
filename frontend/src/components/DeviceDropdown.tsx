@@ -3,9 +3,9 @@ import { ChevronDown } from "lucide-react"
 import { useDeviceStore } from "../store/useDeviceStore"
 import { statusColor } from "../lib/status"
 import { Button } from "./ui/button"
-import type { Device } from "../hooks/useDevices"
+import type { MergedDevice } from "../hooks/useDevices"
 
-export function DeviceDropdown({ devices }: { devices: Device[] }) {
+export function DeviceDropdown({ devices }: { devices: MergedDevice[] }) {
   const { selectedUri, selectDevice } = useDeviceStore()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)

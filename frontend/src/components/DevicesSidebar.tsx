@@ -2,10 +2,10 @@ import { Loader2, Plus, RefreshCw, X } from "lucide-react"
 import { useDeviceStore } from "../store/useDeviceStore"
 import { statusColor } from "../lib/status"
 import { Button } from "./ui/button"
-import type { Device, DiscoveryStatus } from "../hooks/useDevices"
+import type { MergedDevice, DiscoveryStatus } from "../hooks/useDevices"
 
 interface DevicesSidebarProps {
-  devices: Device[]
+  devices: MergedDevice[]
   status: DiscoveryStatus
   refresh: () => void
   launchSimulator: () => void

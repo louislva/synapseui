@@ -1,10 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
-
-export interface SimulatorMeta {
-  id: string
-  pid: number
-  name: string
-}
+import { useState, useEffect, useCallback, useMemo } from "react"
 
 export interface Device {
   uri: string
@@ -14,58 +8,56 @@ export interface Device {
   name: string
   serial: string
   status: string
-  simulator?: SimulatorMeta
 }
 
-interface SimulatorResponse {
+export interface Simulator {
   id: string
   pid: number
-  running: boolean
   name: string
   uri: string
   rpc_port: number
+  running: boolean
 }
+
+export type MergedDevice = Device & { simulator?: Simulator }
 
 export type DiscoveryStatus = "searching" | "ready" | "error"
 
 export function useDevices(enabled: boolean, intervalMs = 5_000) {
   const [devices, setDevices] = useState<Device[]>([])
+  const [simulators, setSimulators] = useState<Simulator[]>([])
   const [status, setStatus] = useState<DiscoveryStatus>("searching")
 
-  const fetchAll = useCallback(async () => {
+  const fetchDevices = useCallback(async () => {
     try {
-      const [devRes, simRes] = await Promise.all([
-        fetch("/api/devices"),
-        fetch("/api/simulators"),
-      ])
-
-      const devData = devRes.ok ? await devRes.json() : { devices: [] }
-      const simData = simRes.ok ? await simRes.json() : { simulators: [] }
-
-      const discovered: Device[] = devData.devices
-      const sims: SimulatorResponse[] = simData.simulators
-
-      const discoveredUris = new Set(discovered.map((d: Device) => d.uri))
-
-      // Create placeholders for simulators not yet discovered
-      const placeholders: Device[] = sims
-        .filter((s) => s.running && !discoveredUris.has(s.uri))
-        .map((s) => ({
-          uri: s.uri,
-          host: "127.0.0.1",
-          port: s.rpc_port,
-          name: s.name,
-          serial: "",
-          status: "Starting...",
-          simulator: { id: s.id, pid: s.pid, name: s.name },
-        }))
-
-      setDevices([...discovered, ...placeholders])
-      setStatus(devRes.ok ? "ready" : "error")
+      const res = await fetch("/api/devices")
+      if (res.ok) {
+        const data = await res.json()
+        setDevices(data.devices)
+        setStatus("ready")
+      } else {
+        setStatus("error")
+      }
     } catch {
       setStatus("error")
     }
   }, [])
+
+  const fetchSimulators = useCallback(async () => {
+    try {
+      const res = await fetch("/api/simulators")
+      if (res.ok) {
+        const data = await res.json()
+        setSimulators(data.simulators)
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const fetchAll = useCallback(async () => {
+    await Promise.all([fetchDevices(), fetchSimulators()])
+  }, [fetchDevices, fetchSimulators])
 
   useEffect(() => {
     if (!enabled) return
@@ -80,6 +72,31 @@ export function useDevices(enabled: boolean, intervalMs = 5_000) {
     fetchAll()
   }, [fetchAll])
 
+  // Merge at display time: enrich discovered devices with sim info,
+  // then append placeholders for simulators not yet discovered
+  const mergedDevices = useMemo<MergedDevice[]>(() => {
+    const discoveredNames = new Set(devices.map((d) => d.name))
+
+    const enriched: MergedDevice[] = devices.map((d) => {
+      const sim = simulators.find((s) => s.name === d.name)
+      return sim ? { ...d, simulator: sim } : d
+    })
+
+    const placeholders: MergedDevice[] = simulators
+      .filter((s) => s.running && !discoveredNames.has(s.name))
+      .map((s) => ({
+        uri: s.uri,
+        host: "127.0.0.1",
+        port: s.rpc_port,
+        name: s.name,
+        serial: "",
+        status: "Starting...",
+        simulator: s,
+      }))
+
+    return [...enriched, ...placeholders]
+  }, [devices, simulators])
+
   const launchSimulator = useCallback(async () => {
     try {
       const res = await fetch("/api/simulators", {
@@ -90,18 +107,19 @@ export function useDevices(enabled: boolean, intervalMs = 5_000) {
       if (!res.ok) throw new Error(res.statusText)
       const data = await res.json()
 
-      // Immediately add placeholder
-      setDevices((prev) => [
-        ...prev,
-        {
-          uri: data.uri,
-          host: "127.0.0.1",
-          port: data.rpc_port,
-          name: data.name,
-          serial: "",
-          status: "Starting...",
-          simulator: { id: data.id, pid: data.pid, name: data.name },
-        },
+      const newSim: Simulator = {
+        id: data.id,
+        pid: data.pid,
+        name: data.name,
+        uri: data.uri,
+        rpc_port: data.rpc_port,
+        running: true,
+      }
+
+      // Overwrite by name
+      setSimulators((prev) => [
+        ...prev.filter((s) => s.name !== newSim.name),
+        newSim,
       ])
     } catch {
       // ignore
@@ -113,14 +131,13 @@ export function useDevices(enabled: boolean, intervalMs = 5_000) {
       try {
         const res = await fetch(`/api/simulators/${id}`, { method: "DELETE" })
         if (!res.ok) throw new Error(res.statusText)
-        // Remove from local state immediately
-        setDevices((prev) => prev.filter((d) => d.simulator?.id !== id))
-        fetchAll()
+        setSimulators((prev) => prev.filter((s) => s.id !== id))
+        fetchDevices()
       } catch {
         // ignore
       }
     },
-    [fetchAll],
+    [fetchDevices],
   )
 
   const updateDeviceStatus = useCallback((uri: string, newStatus: string) => {
@@ -129,5 +146,12 @@ export function useDevices(enabled: boolean, intervalMs = 5_000) {
     )
   }, [])
 
-  return { devices, status, refresh, launchSimulator, killSimulator, updateDeviceStatus }
+  return {
+    devices: mergedDevices,
+    status,
+    refresh,
+    launchSimulator,
+    killSimulator,
+    updateDeviceStatus,
+  }
 }
