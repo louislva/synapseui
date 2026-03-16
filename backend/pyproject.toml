@@ -8,6 +8,9 @@ dependencies = [
     "science-synapse",
 ]
 
+[tool.uv.sources]
+science-synapse = { git = "https://github.com/louislva/synapse-python.git", branch = "simulator-bugfixes-https" }
+
 [build-system]
 requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
