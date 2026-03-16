@@ -57,7 +57,7 @@ export function DevicesSidebar({
       {devices.length > 0 && (
         <ul className="space-y-2">
           {devices.map((d) => {
-            const isStarting = d.status === "Starting..."
+            const isStarting = d.status === "Connecting..."
             return (
               <li
                 key={d.uri}
@@ -116,8 +116,8 @@ export function DevicesSidebar({
                         ? "Device is actively streaming data."
                         : d.status === "Stopped"
                           ? "Device is configured but not streaming. Press Start to begin."
-                          : d.status === "Starting..."
-                            ? "Simulator is launching..."
+                          : d.status === "Connecting..."
+                            ? "Simulator is connecting..."
                             : d.status === "Error"
                               ? "Device encountered an error."
                               : `Device state: ${d.status}`}

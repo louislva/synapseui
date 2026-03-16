@@ -91,7 +91,7 @@ export function useDevices(enabled: boolean, intervalMs = 5_000, onError?: (msg:
         port: s.rpc_port,
         name: s.name,
         serial: "",
-        status: "Starting...",
+        status: "Connecting...",
         simulator: s,
       }))
 

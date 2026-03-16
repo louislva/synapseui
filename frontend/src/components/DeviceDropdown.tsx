@@ -57,7 +57,7 @@ export function DeviceDropdown({ devices }: { devices: MergedDevice[] }) {
             </div>
           ) : (
             devices.map((d) => {
-              const isStarting = d.status === "Starting..."
+              const isStarting = d.status === "Connecting..."
               return (
                 <Button
                   key={d.uri}
