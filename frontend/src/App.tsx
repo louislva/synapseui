@@ -286,7 +286,7 @@ function App() {
                         <div className="text-sm font-medium flex items-center gap-1.5">
                           <span
                             className={`inline-block size-1.5 rounded-full ${
-                              s.running ? "bg-green-500" : "bg-muted-foreground"
+                              s.running ? "bg-blue-500" : "bg-muted-foreground"
                             }`}
                           />
                           Sim {s.id}
