@@ -1,6 +1,7 @@
 import { Trash2 } from "lucide-react"
 import { useGraphStore } from "../store/useGraphStore"
 import { NODE_TYPE_DEFS } from "../nodes/types"
+import { Button } from "./ui/button"
 
 export function ParameterPanel() {
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId)
@@ -29,12 +30,14 @@ export function ParameterPanel() {
             {def.category}
           </p>
         </div>
-        <button
+        <Button
+          variant="ghost"
+          size="icon-xs"
           onClick={() => removeNode(node.id)}
-          className="inline-flex items-center justify-center rounded-md size-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
         >
           <Trash2 className="size-3.5" />
-        </button>
+        </Button>
       </div>
 
       <div className="space-y-3">

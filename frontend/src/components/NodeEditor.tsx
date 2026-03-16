@@ -18,6 +18,7 @@ import {
   CanvasContextMenu,
   NodeContextMenu,
 } from "./NodeContextMenu"
+import { Button } from "./ui/button"
 
 type ContextMenu =
   | { kind: "canvas"; x: number; y: number; flowPosition: { x: number; y: number } }
@@ -80,12 +81,13 @@ export function NodeEditor() {
           <p className="text-sm text-muted-foreground mb-3">
             No config selected.
           </p>
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => createConfig()}
-            className="inline-flex items-center gap-1.5 rounded-md px-3 h-7 text-sm font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors"
           >
             New Config
-          </button>
+          </Button>
         </div>
       </div>
     )

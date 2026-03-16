@@ -20,6 +20,7 @@ import { NodeEditor } from "./components/NodeEditor"
 import { ConfigsSidebar } from "./components/ConfigsSidebar"
 import { ParameterPanel } from "./components/ParameterPanel"
 import { serializeGraph, configHash } from "./lib/serialize"
+import { Button } from "./components/ui/button"
 import type { Device } from "./hooks/useDevices"
 
 function statusColor(status: string) {
@@ -62,9 +63,10 @@ function DeviceDropdown({ devices }: { devices: Device[] }) {
 
   return (
     <div ref={ref} className="relative">
-      <button
+      <Button
+        variant="outline"
+        size="sm"
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 rounded-md px-2.5 h-7 text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors"
       >
         {selected ? (
           <>
@@ -77,7 +79,7 @@ function DeviceDropdown({ devices }: { devices: Device[] }) {
           <span className="text-muted-foreground">No device</span>
         )}
         <ChevronDown className="size-3 text-muted-foreground" />
-      </button>
+      </Button>
 
       {open && (
         <div className="absolute top-full mt-1 right-0 z-50 min-w-[200px] rounded-lg border border-border bg-popover p-1 shadow-lg">
@@ -86,28 +88,37 @@ function DeviceDropdown({ devices }: { devices: Device[] }) {
               No devices found
             </div>
           ) : (
-            devices.map((d) => (
-              <button
-                key={d.uri}
-                onClick={() => {
-                  selectDevice(d.uri)
-                  setOpen(false)
-                }}
-                className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors ${
-                  d.uri === selectedUri
-                    ? "bg-muted text-foreground"
-                    : "hover:bg-muted/50"
-                }`}
-              >
-                <span
-                  className={`size-1.5 rounded-full ${statusColor(d.status)}`}
-                />
-                <span className="flex-1 text-left truncate">{d.name}</span>
-                <span className="text-[10px] text-muted-foreground">
-                  {d.uri}
-                </span>
-              </button>
-            ))
+            devices.map((d) => {
+              const isStarting = d.status === "Starting..."
+              return (
+                <Button
+                  key={d.uri}
+                  variant="ghost"
+                  size="sm"
+                  disabled={isStarting}
+                  onClick={() => {
+                    selectDevice(d.uri)
+                    setOpen(false)
+                  }}
+                  className={`w-full justify-start ${
+                    d.uri === selectedUri ? "bg-muted" : ""
+                  }`}
+                >
+                  <span
+                    className={`size-1.5 rounded-full ${statusColor(d.status)}`}
+                  />
+                  <span className="flex-1 text-left truncate">
+                    {d.name}
+                    {d.simulator && (
+                      <span className="ml-1 text-[10px] text-blue-400">SIM</span>
+                    )}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {d.uri}
+                  </span>
+                </Button>
+              )
+            })
           )}
         </div>
       )}
@@ -123,7 +134,6 @@ function App() {
   const {
     devices,
     status,
-    simulators,
     refresh,
     launchSimulator,
     killSimulator,
@@ -205,31 +215,31 @@ function App() {
         {/* Toolbar */}
         <div className="flex items-center h-11 px-3 gap-2 border-b border-border bg-background">
           {/* Left: Configs toggle */}
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setConfigsOpen(!configsOpen)}
-            className={`inline-flex items-center gap-1.5 rounded-md px-2.5 h-7 text-sm font-medium transition-colors ${
-              configsOpen
-                ? "bg-muted text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            }`}
+            className={configsOpen ? "bg-muted" : "text-muted-foreground"}
           >
             <FileSliders className="size-3.5" />
             Configs
-          </button>
+          </Button>
 
           <div className="flex-1" />
 
           {/* Center: Device selector + Deploy + Start/Stop */}
           <DeviceDropdown devices={devices} />
 
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleDeploy}
             disabled={!canDeploy || deploying}
-            className={`inline-flex items-center gap-1.5 rounded-md px-2.5 h-7 text-sm font-medium transition-colors border ${
-              canDeploy
-                ? "border-border text-foreground hover:bg-muted"
-                : "border-transparent text-muted-foreground opacity-50"
-            } disabled:pointer-events-none`}
+            className={
+              !canDeploy && !deploying
+                ? "border-transparent text-muted-foreground opacity-50"
+                : ""
+            }
           >
             {deploying ? (
               <Loader2 className="size-3.5 animate-spin" />
@@ -237,16 +247,18 @@ function App() {
               <Upload className="size-3.5" />
             )}
             {isDeployed ? "Deployed" : "Deploy"}
-          </button>
+          </Button>
 
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleStartStop}
             disabled={!selectedUri || startingStopping}
-            className={`inline-flex items-center gap-1.5 rounded-md px-2.5 h-7 text-sm font-medium transition-colors border ${
-              selectedUri
-                ? "border-border text-foreground hover:bg-muted"
-                : "border-transparent text-muted-foreground opacity-50"
-            } disabled:pointer-events-none`}
+            className={
+              !selectedUri && !startingStopping
+                ? "border-transparent text-muted-foreground opacity-50"
+                : ""
+            }
           >
             {startingStopping ? (
               <Loader2 className="size-3.5 animate-spin" />
@@ -256,22 +268,20 @@ function App() {
               <Play className="size-3.5 fill-current" />
             )}
             {isRunning ? "Stop" : "Start"}
-          </button>
+          </Button>
 
           <div className="flex-1" />
 
           {/* Right: Devices toggle */}
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setDevicesOpen(!devicesOpen)}
-            className={`inline-flex items-center gap-1.5 rounded-md px-2.5 h-7 text-sm font-medium transition-colors ${
-              devicesOpen
-                ? "bg-muted text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            }`}
+            className={devicesOpen ? "bg-muted" : "text-muted-foreground"}
           >
             <Cpu className="size-3.5" />
             Devices
-          </button>
+          </Button>
         </div>
 
         {/* Main area */}
@@ -292,16 +302,27 @@ function App() {
                 <h2 className="text-sm font-medium text-muted-foreground">
                   Devices
                 </h2>
-                <button
-                  onClick={refresh}
-                  disabled={status === "searching"}
-                  className="inline-flex items-center justify-center rounded-md size-6 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
-                >
-                  <RefreshCw className="size-3.5" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={launchSimulator}
+                    title="Launch simulator"
+                  >
+                    <Plus className="size-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={refresh}
+                    disabled={status === "searching"}
+                  >
+                    <RefreshCw className="size-3.5" />
+                  </Button>
+                </div>
               </div>
 
-              {status === "searching" && (
+              {status === "searching" && devices.length === 0 && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="size-3.5 animate-spin" />
                   Searching...
@@ -314,93 +335,72 @@ function App() {
                 </p>
               )}
 
-              {status === "ready" && devices.length > 0 && (
+              {devices.length > 0 && (
                 <ul className="space-y-2">
-                  {devices.map((d) => (
-                    <li
-                      key={d.uri}
-                      onClick={() => selectDevice(d.uri)}
-                      className={`rounded-md border p-2 cursor-pointer transition-colors ${
-                        d.uri === selectedUri
-                          ? "border-ring bg-muted/50"
-                          : "border-border hover:bg-muted/30"
-                      }`}
-                    >
-                      <div className="text-sm font-medium flex items-center gap-1.5">
-                        <span
-                          className={`inline-block size-1.5 rounded-full ${statusColor(d.status)}`}
-                        />
-                        {d.name}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {d.uri} · {d.status}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {d.serial}
-                      </div>
-                    </li>
-                  ))}
+                  {devices.map((d) => {
+                    const isStarting = d.status === "Starting..."
+                    return (
+                      <li
+                        key={d.uri}
+                        onClick={() => !isStarting && selectDevice(d.uri)}
+                        className={`rounded-md border p-2 transition-colors ${
+                          isStarting
+                            ? "border-border opacity-50 cursor-default"
+                            : d.uri === selectedUri
+                              ? "border-ring bg-muted/50 cursor-pointer"
+                              : "border-border hover:bg-muted/30 cursor-pointer"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-medium flex items-center gap-1.5 min-w-0">
+                            <span
+                              className={`inline-block size-1.5 rounded-full shrink-0 ${statusColor(d.status)}`}
+                            />
+                            <span className="truncate">{d.name}</span>
+                            {d.simulator && (
+                              <span className="shrink-0 text-[10px] font-medium text-blue-400 bg-blue-500/10 rounded px-1">
+                                SIM
+                              </span>
+                            )}
+                          </div>
+                          {d.simulator && (
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                killSimulator(d.simulator!.id)
+                              }}
+                              title="Kill simulator"
+                              className="size-5 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <X className="size-3" />
+                            </Button>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {d.uri} · {d.status}
+                        </div>
+                        {d.simulator && (
+                          <div className="text-xs text-muted-foreground">
+                            PID {d.simulator.pid}
+                          </div>
+                        )}
+                        {d.serial && (
+                          <div className="text-xs text-muted-foreground">
+                            {d.serial}
+                          </div>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
 
-              {status === "error" && (
+              {status === "error" && devices.length === 0 && (
                 <p className="text-sm text-destructive">
                   Failed to reach discovery service.
                 </p>
-              )}
-
-              {/* Simulators section */}
-              <div className="flex items-center justify-between mt-6 mb-3">
-                <h2 className="text-sm font-medium text-muted-foreground">
-                  Simulators
-                </h2>
-                <button
-                  onClick={launchSimulator}
-                  className="inline-flex items-center justify-center rounded-md size-6 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                  title="Launch simulator"
-                >
-                  <Plus className="size-3.5" />
-                </button>
-              </div>
-
-              {simulators.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No simulators running.
-                </p>
-              )}
-
-              {simulators.length > 0 && (
-                <ul className="space-y-2">
-                  {simulators.map((s) => (
-                    <li
-                      key={s.id}
-                      className="rounded-md border border-border p-2 flex items-center justify-between"
-                    >
-                      <div>
-                        <div className="text-sm font-medium flex items-center gap-1.5">
-                          <span
-                            className={`inline-block size-1.5 rounded-full ${
-                              s.running ? "bg-blue-500" : "bg-muted-foreground"
-                            }`}
-                          />
-                          Sim {s.id}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          PID {s.pid}
-                        </div>
-                      </div>
-                      {s.running && (
-                        <button
-                          onClick={() => killSimulator(s.id)}
-                          className="inline-flex items-center justify-center rounded-md size-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                          title="Stop simulator"
-                        >
-                          <X className="size-3.5" />
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
               )}
             </div>
           )}

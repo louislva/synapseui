@@ -2,7 +2,7 @@ import asyncio
 import signal
 import subprocess
 import sys
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -15,9 +15,27 @@ _STATE_NAMES = {v: k.removeprefix("k") for k, v in DeviceState.items()}
 
 app = FastAPI()
 
-# Track running simulator processes: id -> subprocess.Popen
-_simulators: dict[str, subprocess.Popen] = {}
+
+@dataclass
+class SimulatorInfo:
+    proc: subprocess.Popen
+    name: str
+    rpc_port: int
+    uri: str  # "127.0.0.1:{rpc_port}"
+
+
+_simulators: dict[str, SimulatorInfo] = {}
 _next_sim_id = 0
+_allocated_ports: set[int] = set()
+_BASE_RPC_PORT = 647
+_DISCOVERY_PORT_OFFSET = 5823  # 6470 - 647
+
+
+def _next_available_port() -> int:
+    port = _BASE_RPC_PORT
+    while port in _allocated_ports:
+        port += 1
+    return port
 
 
 class NodePayload(BaseModel):
@@ -64,12 +82,12 @@ _NODE_FACTORIES = {
 class SimulatorRequest(BaseModel):
     name: str | None = None
     serial: str | None = None
-    rpc_port: int = 647
-    discovery_port: int = 6470
+    rpc_port: int | None = None
+    discovery_port: int | None = None
 
-    def safe_name(self) -> str | None:
+    def safe_name(self, fallback: str) -> str:
         if self.name is None:
-            return None
+            return fallback
         return self.name.replace(" ", "-")
 
 
@@ -88,11 +106,18 @@ async def get_devices():
     statuses = await asyncio.gather(
         *(asyncio.to_thread(_get_device_status, f"{d.host}:{d.port}") for d in devices)
     )
+    sim_by_uri = {
+        info.uri: (sim_id, info) for sim_id, info in _simulators.items()
+    }
     result = []
     for d, s in zip(devices, statuses):
         dd = asdict(d)
         dd["uri"] = f"{d.host}:{d.port}"
         dd["status"] = s
+        sim_match = sim_by_uri.get(dd["uri"])
+        if sim_match:
+            sim_id, info = sim_match
+            dd["simulator"] = {"id": sim_id, "pid": info.proc.pid, "name": info.name}
         result.append(dd)
     return {"devices": result}
 
@@ -158,11 +183,14 @@ async def stop_device(uri: str):
 async def list_simulators():
     """List all tracked simulators and their status."""
     result = []
-    for sim_id, proc in list(_simulators.items()):
+    for sim_id, info in list(_simulators.items()):
         result.append({
             "id": sim_id,
-            "pid": proc.pid,
-            "running": proc.poll() is None,
+            "pid": info.proc.pid,
+            "running": info.proc.poll() is None,
+            "name": info.name,
+            "uri": info.uri,
+            "rpc_port": info.rpc_port,
         })
     return {"simulators": result}
 
@@ -175,15 +203,18 @@ async def launch_simulator(req: SimulatorRequest):
     sim_id = str(_next_sim_id)
     _next_sim_id += 1
 
+    rpc_port = req.rpc_port if req.rpc_port is not None else _next_available_port()
+    discovery_port = req.discovery_port if req.discovery_port is not None else rpc_port + _DISCOVERY_PORT_OFFSET
+    name = req.safe_name(f"simulator-{sim_id}")
+    uri = f"127.0.0.1:{rpc_port}"
+
     cmd = [
         sys.executable, "-m", "synapse.simulator",
         "--iface-ip", "127.0.0.1",
-        "--rpc-port", str(req.rpc_port),
-        "--discovery-port", str(req.discovery_port),
+        "--rpc-port", str(rpc_port),
+        "--discovery-port", str(discovery_port),
+        "--name", name,
     ]
-    safe_name = req.safe_name()
-    if safe_name:
-        cmd += ["--name", safe_name]
     if req.serial:
         cmd += ["--serial", req.serial]
 
@@ -197,24 +228,26 @@ async def launch_simulator(req: SimulatorRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    _simulators[sim_id] = proc
-    return {"id": sim_id, "pid": proc.pid}
+    _allocated_ports.add(rpc_port)
+    _simulators[sim_id] = SimulatorInfo(proc=proc, name=name, rpc_port=rpc_port, uri=uri)
+    return {"id": sim_id, "pid": proc.pid, "name": name, "uri": uri, "rpc_port": rpc_port}
 
 
 @app.delete("/api/simulators/{sim_id}")
 async def kill_simulator(sim_id: str):
     """Kill a running simulator by ID."""
-    proc = _simulators.get(sim_id)
-    if proc is None:
+    info = _simulators.get(sim_id)
+    if info is None:
         raise HTTPException(status_code=404, detail="Simulator not found")
 
-    if proc.poll() is None:
-        proc.send_signal(signal.SIGTERM)
+    if info.proc.poll() is None:
+        info.proc.send_signal(signal.SIGTERM)
         try:
-            proc.wait(timeout=5)
+            info.proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            proc.kill()
+            info.proc.kill()
 
+    _allocated_ports.discard(info.rpc_port)
     del _simulators[sim_id]
     return {"id": sim_id, "stopped": True}
 
@@ -222,11 +255,12 @@ async def kill_simulator(sim_id: str):
 @app.on_event("shutdown")
 async def cleanup_simulators():
     """Kill all simulators when the server shuts down."""
-    for proc in _simulators.values():
-        if proc.poll() is None:
-            proc.send_signal(signal.SIGTERM)
+    for info in _simulators.values():
+        if info.proc.poll() is None:
+            info.proc.send_signal(signal.SIGTERM)
             try:
-                proc.wait(timeout=3)
+                info.proc.wait(timeout=3)
             except subprocess.TimeoutExpired:
-                proc.kill()
+                info.proc.kill()
     _simulators.clear()
+    _allocated_ports.clear()

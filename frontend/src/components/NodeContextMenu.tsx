@@ -1,5 +1,6 @@
 import { NODE_TYPE_LIST, type NodeTypeDef } from "../nodes/types"
 import { useGraphStore } from "../store/useGraphStore"
+import { Button } from "./ui/button"
 
 interface CanvasMenuProps {
   x: number
@@ -40,17 +41,19 @@ export function CanvasContextMenu({
               {cat}
             </div>
             {items.map((def) => (
-              <button
+              <Button
                 key={def.type}
+                variant="ghost"
+                size="sm"
                 onClick={() => handleAdd(def)}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors"
+                className="w-full justify-start"
               >
                 <span
                   className="size-2 rounded-full"
                   style={{ backgroundColor: def.color }}
                 />
                 {def.label}
-              </button>
+              </Button>
             ))}
           </div>
         )
@@ -74,24 +77,28 @@ export function NodeContextMenu({ x, y, nodeId, onClose }: NodeMenuProps) {
       className="fixed z-50 min-w-[140px] rounded-lg border border-border bg-popover p-1 shadow-lg"
       style={{ left: x, top: y }}
     >
-      <button
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={() => {
           // Placeholder — will open live data viewer later
           onClose()
         }}
-        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors"
+        className="w-full justify-start"
       >
         Tap Output
-      </button>
-      <button
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={() => {
           removeNode(nodeId)
           onClose()
         }}
-        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+        className="w-full justify-start text-destructive hover:bg-destructive/10"
       >
         Delete
-      </button>
+      </Button>
     </div>
   )
 }
