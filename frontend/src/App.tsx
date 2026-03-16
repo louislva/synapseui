@@ -119,9 +119,22 @@ function App() {
                       key={d.serial}
                       className="rounded-md border border-border p-2"
                     >
-                      <div className="text-sm font-medium">{d.name}</div>
+                      <div className="text-sm font-medium flex items-center gap-1.5">
+                        <span
+                          className={`inline-block size-1.5 rounded-full ${
+                            d.status === "Running"
+                              ? "bg-green-500"
+                              : d.status === "Stopped"
+                                ? "bg-yellow-500"
+                                : d.status === "Error" || d.status === "Unreachable"
+                                  ? "bg-red-500"
+                                  : "bg-muted-foreground"
+                          }`}
+                        />
+                        {d.name}
+                      </div>
                       <div className="text-xs text-muted-foreground">
-                        {d.host}:{d.port}
+                        {d.host}:{d.port} · {d.status}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {d.serial}

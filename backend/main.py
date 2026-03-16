@@ -7,7 +7,11 @@ from dataclasses import asdict
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+import synapse as syn
+from synapse.api.status_pb2 import DeviceState
 from synapse.utils.discover import discover
+
+_STATE_NAMES = {v: k.removeprefix("k") for k, v in DeviceState.items()}
 
 app = FastAPI()
 
@@ -28,10 +32,24 @@ class SimulatorRequest(BaseModel):
         return self.name.replace(" ", "-")
 
 
+def _get_device_status(host: str, port: int) -> str:
+    try:
+        device = syn.Device(f"{host}:{port}")
+        info = device.info()
+        return _STATE_NAMES.get(info.status.state, "Unknown")
+    except Exception:
+        return "Unreachable"
+
+
 @app.get("/api/devices")
 async def get_devices():
     devices = await asyncio.to_thread(discover, timeout_sec=5)
-    return {"devices": [asdict(d) for d in devices]}
+    result = []
+    for d in devices:
+        dd = asdict(d)
+        dd["status"] = await asyncio.to_thread(_get_device_status, d.host, d.port)
+        result.append(dd)
+    return {"devices": result}
 
 
 @app.get("/api/simulators")

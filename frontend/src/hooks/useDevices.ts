@@ -6,6 +6,7 @@ export interface Device {
   capability: string
   name: string
   serial: string
+  status: string
 }
 
 export interface Simulator {
