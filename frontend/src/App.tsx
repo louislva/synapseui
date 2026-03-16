@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from "react"
 import { ReactFlowProvider } from "@xyflow/react"
 import {
+  AlertTriangle,
   Cpu,
   FileSliders,
   Loader2,
@@ -22,6 +23,7 @@ import { ParameterPanel } from "./components/ParameterPanel"
 import { StreamPanel } from "./components/StreamPanel"
 import { OnboardingOverlay, useOnboarding } from "./components/OnboardingOverlay"
 import { DeviceHint } from "./components/DeviceHint"
+import { StreamHint } from "./components/StreamHint"
 import { serializeGraph, configHash } from "./lib/serialize"
 import { Button } from "./components/ui/button"
 import {
@@ -107,6 +109,8 @@ function App() {
     selectedUri != null && deployedHashes[selectedUri] === currentHash
   const canDeploy =
     !!activeConfigId && nodes.length > 0 && !!selectedUri && !isDeployed
+  const hasDeployedToDevice =
+    selectedUri != null && selectedUri in deployedHashes
 
   const handleDeploy = async () => {
     if (!selectedUri || !canDeploy) return
@@ -227,13 +231,20 @@ function App() {
                     <Play className="size-3.5 fill-current" />
                   )}
                   {isRunning ? "Stop" : "Start"}
+                  {!isRunning && selectedUri && !hasDeployedToDevice && !startingStopping && (
+                    <AlertTriangle className="size-3 text-amber-400" />
+                  )}
                 </Button>
               </TooltipTrigger>
-              {!selectedUri && !startingStopping && (
+              {!selectedUri && !startingStopping ? (
                 <TooltipContent side="bottom">
                   Select a connected device first
                 </TooltipContent>
-              )}
+              ) : selectedUri && !isRunning && !hasDeployedToDevice && !startingStopping ? (
+                <TooltipContent side="bottom" className="max-w-56 text-center">
+                  This will start the device with whatever config is already on it — deploy first to use your current config
+                </TooltipContent>
+              ) : null}
             </Tooltip>
           </TooltipProvider>
 
@@ -278,6 +289,9 @@ function App() {
               <NodeEditor />
               {activeConfigId && !selectedUri && (
                 <DeviceHint onOpenDevices={() => setDevicesOpen(true)} />
+              )}
+              {isRunning && !streamOpen && (
+                <StreamHint onOpenStream={() => setStreamOpen(true)} />
               )}
             </div>
             {streamOpen && (
