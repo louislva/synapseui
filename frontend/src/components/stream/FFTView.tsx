@@ -39,6 +39,11 @@ export function FFTView({ buffer }: FFTViewProps) {
 
     const MARGIN = { top: 20, right: 16, bottom: 32, left: 48 }
 
+    // Smoothed Y-axis range (EMA over ~10s at 60fps → alpha ≈ 1/600)
+    const SMOOTH_ALPHA = 1 / 600
+    let smoothDbMin = NaN
+    let smoothDbMax = NaN
+
     const draw = () => {
       rafId = requestAnimationFrame(draw)
       const { w, h } = sizeRef.current
@@ -62,7 +67,7 @@ export function FFTView({ buffer }: FFTViewProps) {
       ctx.scale(dpr, dpr)
       const cw = w / dpr, cHeight = h / dpr
 
-      ctx.fillStyle = bg ? `oklch(${bg})` : "#0a0a0a"
+      ctx.fillStyle = bg || "#0a0a0a"
       ctx.fillRect(0, 0, cw, cHeight)
 
       const plotLeft = MARGIN.left
@@ -70,24 +75,38 @@ export function FFTView({ buffer }: FFTViewProps) {
       const plotW = cw - MARGIN.left - MARGIN.right
       const plotH = cHeight - MARGIN.top - MARGIN.bottom
 
-      // Find dB range
-      let dbMin = Infinity, dbMax = -Infinity
+      // Find instantaneous dB range
+      let rawMin = Infinity, rawMax = -Infinity
       for (let i = 1; i < magnitudeDb.length; i++) {
-        if (magnitudeDb[i] < dbMin) dbMin = magnitudeDb[i]
-        if (magnitudeDb[i] > dbMax) dbMax = magnitudeDb[i]
+        if (magnitudeDb[i] < rawMin) rawMin = magnitudeDb[i]
+        if (magnitudeDb[i] > rawMax) rawMax = magnitudeDb[i]
       }
-      // Round to nice range
-      dbMin = Math.floor(dbMin / 10) * 10
-      dbMax = Math.ceil(dbMax / 10) * 10
-      if (dbMax - dbMin < 20) { dbMin = dbMax - 60 }
+      rawMin = Math.floor(rawMin / 10) * 10
+      rawMax = Math.ceil(rawMax / 10) * 10
+      if (rawMax - rawMin < 20) rawMin = rawMax - 60
+
+      // EMA smoothing (seed on first frame)
+      if (isNaN(smoothDbMin)) {
+        smoothDbMin = rawMin
+        smoothDbMax = rawMax
+      } else {
+        smoothDbMin += SMOOTH_ALPHA * (rawMin - smoothDbMin)
+        smoothDbMax += SMOOTH_ALPHA * (rawMax - smoothDbMax)
+        // Allow fast expansion if signal suddenly exceeds range
+        if (rawMin < smoothDbMin) smoothDbMin = smoothDbMin + 0.3 * (rawMin - smoothDbMin)
+        if (rawMax > smoothDbMax) smoothDbMax = smoothDbMax + 0.3 * (rawMax - smoothDbMax)
+      }
+
+      const dbMin = Math.floor(smoothDbMin / 10) * 10
+      const dbMax = Math.ceil(smoothDbMax / 10) * 10
       const dbRange = dbMax - dbMin || 1
 
       const maxFreq = freqs[freqs.length - 1]
 
       // Grid lines
-      ctx.strokeStyle = gridColor ? `oklch(${gridColor})` : "#222"
+      ctx.strokeStyle = gridColor || "#222"
       ctx.lineWidth = 0.5
-      ctx.fillStyle = mutedFg ? `oklch(${mutedFg})` : "#666"
+      ctx.fillStyle = mutedFg || "#666"
       ctx.font = "9px monospace"
       ctx.textBaseline = "middle"
       ctx.textAlign = "right"
@@ -116,7 +135,7 @@ export function FFTView({ buffer }: FFTViewProps) {
       }
 
       // Axis labels
-      ctx.fillStyle = fg ? `oklch(${fg})` : "#ccc"
+      ctx.fillStyle = fg || "#ccc"
       ctx.font = "10px monospace"
       ctx.textAlign = "center"
       ctx.fillText("Frequency", plotLeft + plotW / 2, cHeight - 4)

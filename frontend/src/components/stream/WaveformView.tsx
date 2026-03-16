@@ -54,7 +54,7 @@ export function WaveformView({ buffer }: WaveformViewProps) {
       const bandHCss = ch / numCh
 
       // Clear
-      ctx.fillStyle = bg ? `oklch(${bg})` : "#0a0a0a"
+      ctx.fillStyle = bg || "#0a0a0a"
       ctx.fillRect(0, 0, cw, ch)
 
       // Draw each channel
@@ -75,7 +75,7 @@ export function WaveformView({ buffer }: WaveformViewProps) {
 
         // Separator line
         if (c > 0) {
-          ctx.strokeStyle = gridColor ? `oklch(${gridColor})` : "#222"
+          ctx.strokeStyle = gridColor || "#222"
           ctx.lineWidth = 0.5
           ctx.beginPath()
           ctx.moveTo(0, bandHCss * c)
@@ -84,7 +84,7 @@ export function WaveformView({ buffer }: WaveformViewProps) {
         }
 
         // Channel label
-        ctx.fillStyle = labelColor ? `oklch(${labelColor})` : "#666"
+        ctx.fillStyle = labelColor || "#666"
         ctx.font = "9px monospace"
         ctx.textBaseline = "middle"
         ctx.fillText(`${c}`, 4, yCenter)
