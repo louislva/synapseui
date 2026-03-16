@@ -96,7 +96,7 @@ export const NODE_TYPE_DEFS: Record<string, NodeTypeDef> = {
         key: "high_cutoff_hz",
         label: "High Cutoff",
         type: "number",
-        default: 3000,
+        default: 400,
         min: 0,
         max: 50000,
         step: 10,
