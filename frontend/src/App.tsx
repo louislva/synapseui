@@ -18,113 +18,11 @@ import { useConfigStore } from "./store/useConfigStore"
 import { useDeviceStore } from "./store/useDeviceStore"
 import { NodeEditor } from "./components/NodeEditor"
 import { ConfigsSidebar } from "./components/ConfigsSidebar"
+import { DevicesSidebar } from "./components/DevicesSidebar"
+import { DeviceDropdown } from "./components/DeviceDropdown"
 import { ParameterPanel } from "./components/ParameterPanel"
 import { serializeGraph, configHash } from "./lib/serialize"
 import { Button } from "./components/ui/button"
-import type { Device } from "./hooks/useDevices"
-
-function statusColor(status: string) {
-  switch (status) {
-    case "Running":
-      return "bg-green-500"
-    case "Stopped":
-      return "bg-yellow-500"
-    case "Error":
-    case "Unreachable":
-      return "bg-red-500"
-    default:
-      return "bg-muted-foreground"
-  }
-}
-
-function DeviceDropdown({ devices }: { devices: Device[] }) {
-  const { selectedUri, selectDevice } = useDeviceStore()
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  const selected = devices.find((d) => d.uri === selectedUri)
-
-  useEffect(() => {
-    if (selectedUri && !devices.find((d) => d.uri === selectedUri)) {
-      selectDevice(devices.length > 0 ? devices[0].uri : null)
-    }
-  }, [devices, selectedUri, selectDevice])
-
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as HTMLElement)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [open])
-
-  return (
-    <div ref={ref} className="relative">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setOpen(!open)}
-      >
-        {selected ? (
-          <>
-            <span
-              className={`size-1.5 rounded-full ${statusColor(selected.status)}`}
-            />
-            <span className="max-w-[120px] truncate">{selected.name}</span>
-          </>
-        ) : (
-          <span className="text-muted-foreground">No device</span>
-        )}
-        <ChevronDown className="size-3 text-muted-foreground" />
-      </Button>
-
-      {open && (
-        <div className="absolute top-full mt-1 right-0 z-50 min-w-[200px] rounded-lg border border-border bg-popover p-1 shadow-lg">
-          {devices.length === 0 ? (
-            <div className="px-2 py-1.5 text-sm text-muted-foreground">
-              No devices found
-            </div>
-          ) : (
-            devices.map((d) => {
-              const isStarting = d.status === "Starting..."
-              return (
-                <Button
-                  key={d.uri}
-                  variant="ghost"
-                  size="sm"
-                  disabled={isStarting}
-                  onClick={() => {
-                    selectDevice(d.uri)
-                    setOpen(false)
-                  }}
-                  className={`w-full justify-start ${
-                    d.uri === selectedUri ? "bg-muted" : ""
-                  }`}
-                >
-                  <span
-                    className={`size-1.5 rounded-full ${statusColor(d.status)}`}
-                  />
-                  <span className="flex-1 text-left truncate">
-                    {d.name}
-                    {d.simulator && (
-                      <span className="ml-1 text-[10px] text-blue-400">SIM</span>
-                    )}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {d.uri}
-                  </span>
-                </Button>
-              )
-            })
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
 
 function App() {
   const [configsOpen, setConfigsOpen] = useState(true)
@@ -227,7 +125,6 @@ function App() {
 
           <div className="flex-1" />
 
-          {/* Center: Device selector + Deploy + Start/Stop */}
           <DeviceDropdown devices={devices} />
 
           <Button
@@ -294,115 +191,14 @@ function App() {
 
           {/* Parameter panel (right, when node selected) */}
           {selectedNodeId && <ParameterPanel />}
-
-          {/* Devices sidebar (right) */}
           {devicesOpen && (
-            <div className="w-64 border-l border-border bg-background p-4 overflow-y-auto">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-medium text-muted-foreground">
-                  Devices
-                </h2>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    onClick={launchSimulator}
-                    title="Launch simulator"
-                  >
-                    <Plus className="size-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    onClick={refresh}
-                    disabled={status === "searching"}
-                  >
-                    <RefreshCw className="size-3.5" />
-                  </Button>
-                </div>
-              </div>
-
-              {status === "searching" && devices.length === 0 && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="size-3.5 animate-spin" />
-                  Searching...
-                </div>
-              )}
-
-              {status === "ready" && devices.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No devices found.
-                </p>
-              )}
-
-              {devices.length > 0 && (
-                <ul className="space-y-2">
-                  {devices.map((d) => {
-                    const isStarting = d.status === "Starting..."
-                    return (
-                      <li
-                        key={d.uri}
-                        onClick={() => !isStarting && selectDevice(d.uri)}
-                        className={`rounded-md border p-2 transition-colors ${
-                          isStarting
-                            ? "border-border opacity-50 cursor-default"
-                            : d.uri === selectedUri
-                              ? "border-ring bg-muted/50 cursor-pointer"
-                              : "border-border hover:bg-muted/30 cursor-pointer"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm font-medium flex items-center gap-1.5 min-w-0">
-                            <span
-                              className={`inline-block size-1.5 rounded-full shrink-0 ${statusColor(d.status)}`}
-                            />
-                            <span className="truncate">{d.name}</span>
-                            {d.simulator && (
-                              <span className="shrink-0 text-[10px] font-medium text-blue-400 bg-blue-500/10 rounded px-1">
-                                SIM
-                              </span>
-                            )}
-                          </div>
-                          {d.simulator && (
-                            <Button
-                              variant="ghost"
-                              size="icon-xs"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                killSimulator(d.simulator!.id)
-                              }}
-                              title="Kill simulator"
-                              className="size-5 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                            >
-                              <X className="size-3" />
-                            </Button>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {d.uri} · {d.status}
-                        </div>
-                        {d.simulator && (
-                          <div className="text-xs text-muted-foreground">
-                            PID {d.simulator.pid}
-                          </div>
-                        )}
-                        {d.serial && (
-                          <div className="text-xs text-muted-foreground">
-                            {d.serial}
-                          </div>
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-
-              {status === "error" && devices.length === 0 && (
-                <p className="text-sm text-destructive">
-                  Failed to reach discovery service.
-                </p>
-              )}
-            </div>
+            <DevicesSidebar
+              devices={devices}
+              status={status}
+              refresh={refresh}
+              launchSimulator={launchSimulator}
+              killSimulator={killSimulator}
+            />
           )}
         </div>
       </div>

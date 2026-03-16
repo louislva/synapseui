@@ -26,7 +26,7 @@ interface SimulatorResponse {
   rpc_port: number
 }
 
-type DiscoveryStatus = "searching" | "ready" | "error"
+export type DiscoveryStatus = "searching" | "ready" | "error"
 
 export function useDevices(enabled: boolean, intervalMs = 5_000) {
   const [devices, setDevices] = useState<Device[]>([])

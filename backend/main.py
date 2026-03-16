@@ -1,14 +1,17 @@
 import asyncio
+import json
 import signal
 import subprocess
 import sys
 from dataclasses import asdict, dataclass
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
 import synapse as syn
+from synapse.api.datatype_pb2 import BroadbandFrame
 from synapse.api.status_pb2 import DeviceState
+from synapse.client.taps import Tap
 from synapse.utils.discover import discover
 
 _STATE_NAMES = {v: k.removeprefix("k") for k, v in DeviceState.items()}
@@ -250,6 +253,115 @@ async def kill_simulator(sim_id: str):
     _allocated_ports.discard(info.rpc_port)
     del _simulators[sim_id]
     return {"id": sim_id, "stopped": True}
+
+
+@app.get("/api/devices/taps")
+async def list_taps(uri: str):
+    """List available taps on a running device."""
+    def _list():
+        tap = Tap(uri)
+        return tap.list_taps()
+
+    try:
+        taps = await asyncio.to_thread(_list)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list taps: {e}")
+
+    return {
+        "taps": [
+            {
+                "name": t.name,
+                "message_type": t.message_type,
+                "endpoint": t.endpoint,
+                "tap_type": t.tap_type,
+            }
+            for t in taps
+        ]
+    }
+
+
+def _decode_frame(raw: bytes, message_type: str) -> dict | None:
+    if "BroadbandFrame" in message_type:
+        frame = BroadbandFrame()
+        frame.ParseFromString(raw)
+        return {
+            "type": "broadband",
+            "timestamp_ns": frame.timestamp_ns,
+            "sequence_number": frame.sequence_number,
+            "sample_rate_hz": frame.sample_rate_hz,
+            "num_channels": len(frame.frame_data),
+            "frame_data": list(frame.frame_data),
+        }
+    # Unknown type — send hex-encoded raw bytes
+    return {
+        "type": "raw",
+        "size": len(raw),
+        "hex": raw[:64].hex(),
+    }
+
+
+@app.websocket("/api/devices/stream")
+async def stream_tap(ws: WebSocket, uri: str, tap_name: str):
+    """Stream tap data over WebSocket."""
+    await ws.accept()
+
+    tap = Tap(uri)
+
+    # Connect to the tap in a thread (ZMQ setup)
+    connected = await asyncio.to_thread(tap.connect, tap_name)
+    if not connected:
+        await ws.send_json({"error": f"Failed to connect to tap '{tap_name}'"})
+        await ws.close()
+        return
+
+    # Find the message type for this tap
+    taps = await asyncio.to_thread(tap.list_taps)
+    message_type = "unknown"
+    for t in taps:
+        if t.name == tap_name:
+            message_type = t.message_type
+            break
+
+    await ws.send_json({"status": "connected", "tap_name": tap_name, "message_type": message_type})
+
+    stop_event = asyncio.Event()
+
+    async def _read_loop():
+        """Read from ZMQ tap in a thread and forward to WebSocket."""
+        batch_interval = 1.0 / 30  # ~30 updates/sec to browser
+        while not stop_event.is_set():
+            frames = []
+            deadline = asyncio.get_event_loop().time() + batch_interval
+
+            while asyncio.get_event_loop().time() < deadline and not stop_event.is_set():
+                raw = await asyncio.to_thread(tap.read, 50)
+                if raw is not None:
+                    decoded = _decode_frame(raw, message_type)
+                    if decoded:
+                        frames.append(decoded)
+                else:
+                    await asyncio.sleep(0.01)
+
+            if frames and not stop_event.is_set():
+                try:
+                    await ws.send_text(json.dumps({"frames": frames}))
+                except Exception:
+                    break
+
+    async def _recv_loop():
+        """Listen for client close / commands."""
+        try:
+            while True:
+                await ws.receive_text()
+        except WebSocketDisconnect:
+            pass
+        finally:
+            stop_event.set()
+
+    try:
+        await asyncio.gather(_read_loop(), _recv_loop())
+    finally:
+        await asyncio.to_thread(tap.disconnect)
 
 
 @app.on_event("shutdown")
