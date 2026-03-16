@@ -1,5 +1,5 @@
-import { Handle, Position, type NodeProps } from "@xyflow/react"
-import { Radio } from "lucide-react"
+import { Handle, Position, useEdges, useNodes, type Node, type NodeProps } from "@xyflow/react"
+import { AlertTriangle, Radio } from "lucide-react"
 import { NODE_TYPE_DEFS, type NodeData } from "./types"
 import { useDeviceStore } from "../store/useDeviceStore"
 
@@ -8,12 +8,36 @@ function normalize(s: string): string {
   return s.toLowerCase().replace(/[_\s-]/g, "")
 }
 
-export function BaseNode({ data, selected }: NodeProps & { data: NodeData }) {
+export function BaseNode({ data, id, selected }: NodeProps & { data: NodeData }) {
   const def = NODE_TYPE_DEFS[data.type]
   const taps = useDeviceStore((s) => s.taps)
   const requestStreamTap = useDeviceStore((s) => s.requestStreamTap)
+  const allNodes = useNodes<Node<NodeData>>()
+  const allEdges = useEdges()
 
   if (!def) return null
+
+  // Check for Nyquist violations on spectral filter nodes
+  let hasNyquistWarning = false
+  if (data.type === "spectral_filter") {
+    const inEdge = allEdges.find((e) => e.target === id)
+    if (inEdge) {
+      const srcNode = allNodes.find((n) => n.id === inEdge.source)
+      const sr = srcNode?.data?.params?.["sample_rate_hz"]
+      if (typeof sr === "number") {
+        const nyquist = sr / 2
+        const method = data.params["method"]
+        const low = data.params["low_cutoff_hz"] as number
+        const high = data.params["high_cutoff_hz"] as number
+        if ((method === "kLowPass" || method === "kBandPass" || method === "kBandStop") && high >= nyquist) {
+          hasNyquistWarning = true
+        }
+        if ((method === "kHighPass" || method === "kBandPass" || method === "kBandStop") && low >= nyquist) {
+          hasNyquistWarning = true
+        }
+      }
+    }
+  }
 
   const inputs = def.ports.filter((p) => p.direction === "input")
   const outputs = def.ports.filter((p) => p.direction === "output")
@@ -35,10 +59,13 @@ export function BaseNode({ data, selected }: NodeProps & { data: NodeData }) {
     >
       {/* Header */}
       <div
-        className="rounded-t-lg px-3 py-1.5 text-xs font-semibold text-white"
+        className="rounded-t-lg px-3 py-1.5 text-xs font-semibold text-white flex items-center justify-between"
         style={{ backgroundColor: def.color }}
       >
         {data.label}
+        {hasNyquistWarning && (
+          <AlertTriangle className="size-3.5 text-amber-200" />
+        )}
       </div>
 
       {/* Parameter summary */}
