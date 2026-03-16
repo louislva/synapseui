@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useMemo, useEffect } from "react"
 import { ReactFlowProvider } from "@xyflow/react"
 import {
   Cpu,
@@ -52,6 +52,43 @@ function App() {
   const selectedUri = useDeviceStore((s) => s.selectedUri)
   const deployedHashes = useDeviceStore((s) => s.deployedHashes)
   const setDeployedHash = useDeviceStore((s) => s.setDeployedHash)
+  const setTaps = useDeviceStore((s) => s.setTaps)
+  const pendingTapName = useDeviceStore((s) => s.pendingTapName)
+
+  // Poll for available taps on the selected device
+  useEffect(() => {
+    if (!selectedUri) {
+      setTaps([])
+      return
+    }
+    let cancelled = false
+    const fetchTaps = async () => {
+      try {
+        const res = await fetch(
+          `/api/devices/taps?uri=${encodeURIComponent(selectedUri)}`,
+        )
+        if (res.ok && !cancelled) {
+          const data = await res.json()
+          setTaps(data.taps ?? [])
+        }
+      } catch {
+        // ignore
+      }
+    }
+    fetchTaps()
+    const id = setInterval(fetchTaps, 5000)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [selectedUri, setTaps])
+
+  // When a node requests to open a specific tap, open the stream panel
+  useEffect(() => {
+    if (pendingTapName) {
+      setStreamOpen(true)
+    }
+  }, [pendingTapName])
 
   const selectedDevice = devices.find((d) => d.uri === selectedUri)
   const isRunning = selectedDevice?.status === "Running"

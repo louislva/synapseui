@@ -7,13 +7,6 @@ import { HeatmapView } from "./stream/HeatmapView"
 import { WaveformView } from "./stream/WaveformView"
 import { FFTView } from "./stream/FFTView"
 
-interface TapInfo {
-  name: string
-  message_type: string
-  endpoint: string
-  tap_type: number
-}
-
 interface StreamMessage {
   frames?: Array<Record<string, unknown>>
   status?: string
@@ -35,7 +28,9 @@ const VIEW_LABELS: Record<ViewMode, string> = {
 
 export function StreamPanel({ onClose }: { onClose: () => void }) {
   const selectedUri = useDeviceStore((s) => s.selectedUri)
-  const [taps, setTaps] = useState<TapInfo[]>([])
+  const taps = useDeviceStore((s) => s.taps)
+  const pendingTapName = useDeviceStore((s) => s.pendingTapName)
+  const clearPendingTap = useDeviceStore((s) => s.clearPendingTap)
   const [selectedTap, setSelectedTap] = useState<string>("")
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [messages, setMessages] = useState<string[]>([])
@@ -66,35 +61,6 @@ export function StreamPanel({ onClose }: { onClose: () => void }) {
         : selectedTap && !tapAvailable
           ? "unavailable"
           : "idle"
-
-  // Fetch taps when device changes
-  useEffect(() => {
-    if (!selectedUri) {
-      setTaps([])
-      return
-    }
-    let cancelled = false
-    const fetchTaps = async () => {
-      try {
-        const res = await fetch(
-          `/api/devices/taps?uri=${encodeURIComponent(selectedUri)}`,
-        )
-        if (res.ok && !cancelled) {
-          const data = await res.json()
-          setTaps(data.taps ?? [])
-        }
-      } catch {
-        // ignore
-      }
-    }
-    fetchTaps()
-    // Re-fetch every 5s in case device state changes
-    const id = setInterval(fetchTaps, 5000)
-    return () => {
-      cancelled = true
-      clearInterval(id)
-    }
-  }, [selectedUri])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -218,6 +184,18 @@ export function StreamPanel({ onClose }: { onClose: () => void }) {
     },
     [selectedUri, disconnect],
   )
+
+  // Handle pending tap request from node click
+  useEffect(() => {
+    if (!pendingTapName) return
+    if (taps.some((t) => t.name === pendingTapName)) {
+      setSelectedTap(pendingTapName)
+      setDropdownOpen(false)
+      setReconnecting(false)
+      connectToTap(pendingTapName)
+    }
+    clearPendingTap()
+  }, [pendingTapName, taps, connectToTap, clearPendingTap])
 
   // Auto-reconnect when tap reappears in the taps list
   useEffect(() => {
