@@ -1,36 +1,142 @@
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { ReactFlowProvider } from "@xyflow/react"
-import { Cpu, FileSliders, Loader2, Plus, RefreshCw, Upload, X } from "lucide-react"
+import {
+  ChevronDown,
+  Cpu,
+  FileSliders,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Upload,
+  X,
+} from "lucide-react"
 import { useDevices } from "./hooks/useDevices"
 import { useGraphStore } from "./store/useGraphStore"
 import { useConfigStore } from "./store/useConfigStore"
+import { useDeviceStore } from "./store/useDeviceStore"
 import { NodeEditor } from "./components/NodeEditor"
 import { ConfigsSidebar } from "./components/ConfigsSidebar"
 import { ParameterPanel } from "./components/ParameterPanel"
 import { serializeGraph } from "./lib/serialize"
+import type { Device } from "./hooks/useDevices"
+
+function statusColor(status: string) {
+  switch (status) {
+    case "Running":
+      return "bg-green-500"
+    case "Stopped":
+      return "bg-yellow-500"
+    case "Error":
+    case "Unreachable":
+      return "bg-red-500"
+    default:
+      return "bg-muted-foreground"
+  }
+}
+
+function DeviceDropdown({ devices }: { devices: Device[] }) {
+  const { selectedSerial, selectDevice } = useDeviceStore()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  const selected = devices.find((d) => d.serial === selectedSerial)
+
+  // Auto-select first device if current selection is gone
+  useEffect(() => {
+    if (selectedSerial && !devices.find((d) => d.serial === selectedSerial)) {
+      selectDevice(devices.length > 0 ? devices[0].serial : null)
+    }
+  }, [devices, selectedSerial, selectDevice])
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as HTMLElement)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [open])
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="inline-flex items-center gap-1.5 rounded-md px-2.5 h-7 text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors"
+      >
+        {selected ? (
+          <>
+            <span className={`size-1.5 rounded-full ${statusColor(selected.status)}`} />
+            <span className="max-w-[120px] truncate">{selected.name}</span>
+          </>
+        ) : (
+          <span className="text-muted-foreground">No device</span>
+        )}
+        <ChevronDown className="size-3 text-muted-foreground" />
+      </button>
+
+      {open && (
+        <div className="absolute top-full mt-1 right-0 z-50 min-w-[200px] rounded-lg border border-border bg-popover p-1 shadow-lg">
+          {devices.length === 0 ? (
+            <div className="px-2 py-1.5 text-sm text-muted-foreground">
+              No devices found
+            </div>
+          ) : (
+            devices.map((d) => (
+              <button
+                key={d.serial}
+                onClick={() => {
+                  selectDevice(d.serial)
+                  setOpen(false)
+                }}
+                className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors ${
+                  d.serial === selectedSerial
+                    ? "bg-muted text-foreground"
+                    : "hover:bg-muted/50"
+                }`}
+              >
+                <span className={`size-1.5 rounded-full ${statusColor(d.status)}`} />
+                <span className="flex-1 text-left truncate">{d.name}</span>
+                <span className="text-[10px] text-muted-foreground">{d.serial}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function App() {
   const [configsOpen, setConfigsOpen] = useState(true)
   const [devicesOpen, setDevicesOpen] = useState(false)
-  const { devices, status, simulators, refresh, launchSimulator, killSimulator } = useDevices(devicesOpen)
+  const { devices, status, simulators, refresh, launchSimulator, killSimulator } =
+    useDevices(true)
 
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId)
   const nodes = useGraphStore((s) => s.nodes)
   const edges = useGraphStore((s) => s.edges)
   const activeConfigId = useConfigStore((s) => s.activeConfigId)
   const saveActiveConfig = useConfigStore((s) => s.saveActiveConfig)
+  const selectedSerial = useDeviceStore((s) => s.selectedSerial)
+  const selectDevice = useDeviceStore((s) => s.selectDevice)
 
   const handleDeploy = () => {
     saveActiveConfig()
     const payload = serializeGraph(nodes, edges)
-    console.log("Deploy config:", JSON.stringify(payload, null, 2))
+    console.log(
+      `Deploy to device ${selectedSerial}:`,
+      JSON.stringify(payload, null, 2),
+    )
   }
 
   return (
     <ReactFlowProvider>
       <div className="flex flex-col h-screen">
         {/* Toolbar */}
-        <div className="flex items-center h-11 px-3 border-b border-border bg-background">
+        <div className="flex items-center h-11 px-3 gap-2 border-b border-border bg-background">
           {/* Left: Configs toggle */}
           <button
             onClick={() => setConfigsOpen(!configsOpen)}
@@ -46,10 +152,12 @@ function App() {
 
           <div className="flex-1" />
 
-          {/* Center: Deploy */}
+          {/* Center: Device selector + Deploy */}
+          <DeviceDropdown devices={devices} />
+
           <button
             onClick={handleDeploy}
-            disabled={!activeConfigId || nodes.length === 0}
+            disabled={!activeConfigId || nodes.length === 0 || !selectedSerial}
             className="inline-flex items-center gap-1.5 rounded-md px-3 h-7 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:pointer-events-none"
           >
             <Upload className="size-3.5" />
@@ -117,19 +225,16 @@ function App() {
                   {devices.map((d) => (
                     <li
                       key={d.serial}
-                      className="rounded-md border border-border p-2"
+                      onClick={() => selectDevice(d.serial)}
+                      className={`rounded-md border p-2 cursor-pointer transition-colors ${
+                        d.serial === selectedSerial
+                          ? "border-ring bg-muted/50"
+                          : "border-border hover:bg-muted/30"
+                      }`}
                     >
                       <div className="text-sm font-medium flex items-center gap-1.5">
                         <span
-                          className={`inline-block size-1.5 rounded-full ${
-                            d.status === "Running"
-                              ? "bg-green-500"
-                              : d.status === "Stopped"
-                                ? "bg-yellow-500"
-                                : d.status === "Error" || d.status === "Unreachable"
-                                  ? "bg-red-500"
-                                  : "bg-muted-foreground"
-                          }`}
+                          className={`inline-block size-1.5 rounded-full ${statusColor(d.status)}`}
                         />
                         {d.name}
                       </div>
