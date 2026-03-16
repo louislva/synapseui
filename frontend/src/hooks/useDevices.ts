@@ -23,7 +23,7 @@ export type MergedDevice = Device & { simulator?: Simulator }
 
 export type DiscoveryStatus = "searching" | "ready" | "error"
 
-export function useDevices(enabled: boolean, intervalMs = 5_000) {
+export function useDevices(enabled: boolean, intervalMs = 5_000, onError?: (msg: string) => void) {
   const [devices, setDevices] = useState<Device[]>([])
   const [simulators, setSimulators] = useState<Simulator[]>([])
   const [status, setStatus] = useState<DiscoveryStatus>("searching")
@@ -38,7 +38,8 @@ export function useDevices(enabled: boolean, intervalMs = 5_000) {
       } else {
         setStatus("error")
       }
-    } catch {
+    } catch (e) {
+      console.warn("Device discovery failed:", e)
       setStatus("error")
     }
   }, [])
@@ -50,8 +51,8 @@ export function useDevices(enabled: boolean, intervalMs = 5_000) {
         const data = await res.json()
         setSimulators(data.simulators)
       }
-    } catch {
-      // ignore
+    } catch (e) {
+      console.warn("Failed to fetch simulators:", e)
     }
   }, [])
 
@@ -121,10 +122,11 @@ export function useDevices(enabled: boolean, intervalMs = 5_000) {
         ...prev.filter((s) => s.name !== newSim.name),
         newSim,
       ])
-    } catch {
-      // ignore
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Unknown error"
+      onError?.(`Failed to launch simulator: ${msg}`)
     }
-  }, [])
+  }, [onError])
 
   const killSimulator = useCallback(
     async (id: string) => {
@@ -133,11 +135,12 @@ export function useDevices(enabled: boolean, intervalMs = 5_000) {
         if (!res.ok) throw new Error(res.statusText)
         setSimulators((prev) => prev.filter((s) => s.id !== id))
         fetchDevices()
-      } catch {
-        // ignore
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Unknown error"
+        onError?.(`Failed to kill simulator: ${msg}`)
       }
     },
-    [fetchDevices],
+    [fetchDevices, onError],
   )
 
   const updateDeviceStatus = useCallback((uri: string, newStatus: string) => {

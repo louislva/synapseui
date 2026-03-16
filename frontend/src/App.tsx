@@ -42,7 +42,7 @@ function App() {
     launchSimulator,
     killSimulator,
     updateDeviceStatus,
-  } = useDevices(true)
+  } = useDevices(true, 5_000, showError)
 
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId)
   const nodes = useGraphStore((s) => s.nodes)
@@ -71,8 +71,8 @@ function App() {
           const data = await res.json()
           setTaps(data.taps ?? [])
         }
-      } catch {
-        // ignore
+      } catch (e) {
+        console.warn("Failed to fetch taps:", e)
       }
     }
     fetchTaps()

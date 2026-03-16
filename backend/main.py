@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import signal
 import subprocess
 import sys
@@ -16,6 +17,8 @@ from synapse.client.taps import Tap
 from synapse.utils.discover import discover
 
 _STATE_NAMES = {v: k.removeprefix("k") for k, v in DeviceState.items()}
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -406,6 +409,7 @@ async def stream_tap(ws: WebSocket, uri: str, tap_name: str):
                     try:
                         await ws.send_text(json.dumps({"frames": frames}))
                     except Exception:
+                        logger.debug("WebSocket send failed, closing stream", exc_info=True)
                         break
             else:
                 if asyncio.get_event_loop().time() - last_data_time > idle_timeout:
@@ -419,7 +423,7 @@ async def stream_tap(ws: WebSocket, uri: str, tap_name: str):
             while not stop_event.is_set():
                 await ws.receive_text()
         except Exception:
-            pass
+            logger.debug("WebSocket receive loop ended", exc_info=True)
         finally:
             stop_event.set()
 
