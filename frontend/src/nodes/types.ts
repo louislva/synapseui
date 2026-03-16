@@ -41,7 +41,7 @@ export const NODE_TYPE_DEFS: Record<string, NodeTypeDef> = {
         key: "sample_rate_hz",
         label: "Sample Rate",
         type: "number",
-        default: 30000,
+        default: 1000,
         min: 1000,
         max: 100000,
         step: 1000,

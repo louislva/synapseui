@@ -6,6 +6,10 @@ SynapseUI makes it easy to get started with Synapse by letting you spin up simul
 
 ![Full UI with node editing and device management](docs/screenshots/full-ui.png)
 
+## Demo
+
+Try it out at [synapseui.louisarge.com](https://synapseui.louisarge.com/) — note that since it's running on a remote server, it won't be able to discover devices on your local network.
+
 ## Features
 
 - **Visual signal chain editor** — Drag-and-drop node graph for building signal processing pipelines (Broadband Source, Spectral Filter, Spike Source, Optical Stimulation)
