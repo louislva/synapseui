@@ -3,6 +3,7 @@ import { ReactFlowProvider } from "@xyflow/react"
 import {
   AlertTriangle,
   Cpu,
+  ExternalLink,
   FileSliders,
   Loader2,
   Play,
@@ -167,6 +168,19 @@ function App() {
       <div className="flex flex-col h-screen">
         {/* Toolbar */}
         <div className="flex items-center h-11 px-3 gap-2 border-b border-border bg-background">
+          <span className="text-sm font-semibold tracking-tight mr-1">SynapseUI</span>
+          <a
+            href="https://github.com/louislva/synapseui"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            title="View on GitHub"
+          >
+            <ExternalLink className="size-3.5" />
+          </a>
+
+          <div className="w-px h-5 bg-border mx-1" />
+
           <Button
             variant="ghost"
             size="sm"
