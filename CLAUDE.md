@@ -1,5 +1,7 @@
 # SynapseUI
 
+> **Do NOT start dev servers (frontend, backend, or simulator) unless explicitly asked by the user.**
+
 ## Frontend
 
 - **Location:** `frontend/`
@@ -53,3 +55,28 @@ backend/
 ├── main.py          # FastAPI app with device discovery endpoint
 └── pyproject.toml   # Project config and dependencies
 ```
+
+## Simulator
+
+The `science-synapse` package provides a device simulator for local development.
+
+### Running
+
+Start the simulator from `backend/`:
+
+```
+uv run synapse-sim --iface-ip 127.0.0.1
+```
+
+Optional flags: `--name <name>`, `--serial <serial>`, `--rpc-port`, `--discovery-port`, `--discovery-addr`, `-v`.
+
+## Running All Services
+
+Start both dev servers in separate terminals (or as background tasks):
+
+1. **Backend:** `cd backend && uv run uvicorn main:app --reload`
+2. **Frontend:** `cd frontend && npm run dev`
+
+Optionally, also start the simulator for local device emulation:
+
+3. **Simulator (optional):** `cd backend && uv run synapse-sim --iface-ip 127.0.0.1`
