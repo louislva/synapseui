@@ -26,6 +26,7 @@ export function StreamPanel({ onClose }: { onClose: () => void }) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [messages, setMessages] = useState<string[]>([])
   const [connected, setConnected] = useState(false)
+  const [reconnecting, setReconnecting] = useState(false)
   const [frameCount, setFrameCount] = useState(0)
   const [fps, setFps] = useState(0)
   const wsRef = useRef<WebSocket | null>(null)
@@ -33,6 +34,23 @@ export function StreamPanel({ onClose }: { onClose: () => void }) {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const fpsCountRef = useRef(0)
   const fpsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const selectedTapRef = useRef(selectedTap)
+
+  // Keep ref in sync so ws.onclose can read current value
+  useEffect(() => {
+    selectedTapRef.current = selectedTap
+  }, [selectedTap])
+
+  const tapAvailable = taps.some((t) => t.name === selectedTap)
+
+  const streamStatus: "connected" | "reconnecting" | "unavailable" | "idle" =
+    connected
+      ? "connected"
+      : reconnecting
+        ? "reconnecting"
+        : selectedTap && !tapAvailable
+          ? "unavailable"
+          : "idle"
 
   // Fetch taps when device changes
   useEffect(() => {
@@ -98,7 +116,7 @@ export function StreamPanel({ onClose }: { onClose: () => void }) {
   }, [])
 
   const connectToTap = useCallback(
-    (tapName: string) => {
+    (tapName: string, isReconnect = false) => {
       disconnect()
       if (!tapName || !selectedUri) return
 
@@ -109,9 +127,17 @@ export function StreamPanel({ onClose }: { onClose: () => void }) {
       wsRef.current = ws
 
       ws.onopen = () => {
-        setMessages([])
+        if (isReconnect) {
+          setMessages((prev) => [
+            ...prev.slice(-MAX_MESSAGES),
+            `--- Reconnected to "${tapName}" (${new Date().toLocaleTimeString()}) ---`,
+          ])
+        } else {
+          setMessages([])
+        }
         setFrameCount(0)
         fpsCountRef.current = 0
+        setReconnecting(false)
       }
 
       ws.onmessage = (event) => {
@@ -154,11 +180,26 @@ export function StreamPanel({ onClose }: { onClose: () => void }) {
 
       ws.onclose = () => {
         setConnected(false)
-        setMessages((prev) => [...prev.slice(-MAX_MESSAGES), "Disconnected"])
+        setMessages((prev) => [
+          ...prev.slice(-MAX_MESSAGES),
+          `--- Disconnected (${new Date().toLocaleTimeString()}) ---`,
+        ])
+        // If a tap is still selected, try to reconnect when it reappears
+        if (selectedTapRef.current) {
+          setReconnecting(true)
+        }
       }
     },
     [selectedUri, disconnect],
   )
+
+  // Auto-reconnect when tap reappears in the taps list
+  useEffect(() => {
+    if (!selectedTap || connected || !reconnecting) return
+    if (taps.some((t) => t.name === selectedTap)) {
+      connectToTap(selectedTap, true)
+    }
+  }, [taps, selectedTap, connected, reconnecting, connectToTap])
 
   // Auto-scroll log
   useEffect(() => {
@@ -179,6 +220,7 @@ export function StreamPanel({ onClose }: { onClose: () => void }) {
   const handleSelectTap = (tapName: string) => {
     setSelectedTap(tapName)
     setDropdownOpen(false)
+    setReconnecting(false)
     if (tapName === "") {
       disconnect()
       setMessages([])
@@ -189,6 +231,15 @@ export function StreamPanel({ onClose }: { onClose: () => void }) {
   }
 
   const selectedTapInfo = taps.find((t) => t.name === selectedTap)
+
+  const statusDot =
+    streamStatus === "connected" ? (
+      <span className="size-1.5 rounded-full bg-green-500" />
+    ) : streamStatus === "reconnecting" ? (
+      <span className="size-1.5 rounded-full bg-yellow-500 animate-pulse" />
+    ) : streamStatus === "unavailable" ? (
+      <span className="size-1.5 rounded-full bg-red-500" />
+    ) : null
 
   return (
     <div className="border-t border-border bg-background flex flex-col h-[280px] min-h-[120px]">
@@ -204,9 +255,7 @@ export function StreamPanel({ onClose }: { onClose: () => void }) {
             onClick={() => setDropdownOpen(!dropdownOpen)}
             className="inline-flex items-center gap-1.5 rounded-md px-2 h-6 text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors"
           >
-            {connected && (
-              <span className="size-1.5 rounded-full bg-green-500" />
-            )}
+            {statusDot}
             <span className="max-w-[200px] truncate">
               {selectedTap || "Select tap..."}
             </span>
@@ -286,7 +335,14 @@ export function StreamPanel({ onClose }: { onClose: () => void }) {
           </div>
         ) : (
           messages.map((msg, i) => (
-            <div key={i} className="whitespace-nowrap">
+            <div
+              key={i}
+              className={
+                msg.startsWith("---")
+                  ? "text-center text-muted-foreground/50 text-[10px] py-1"
+                  : "whitespace-nowrap"
+              }
+            >
               {msg}
             </div>
           ))

@@ -391,9 +391,12 @@ async def stream_tap(ws: WebSocket, uri: str, tap_name: str):
 
     async def _read_loop():
         batch_interval = 1.0 / 30
+        idle_timeout = 5.0  # Close WS if no data for this long
+        last_data_time = asyncio.get_event_loop().time()
         while not stop_event.is_set():
             raw_msgs = await asyncio.to_thread(_read_batch)
             if raw_msgs:
+                last_data_time = asyncio.get_event_loop().time()
                 frames = []
                 for raw in raw_msgs:
                     decoded = _decode_frame(raw, message_type)
@@ -405,13 +408,17 @@ async def stream_tap(ws: WebSocket, uri: str, tap_name: str):
                     except Exception:
                         break
             else:
+                if asyncio.get_event_loop().time() - last_data_time > idle_timeout:
+                    stop_event.set()
+                    await ws.close()
+                    return
                 await asyncio.sleep(batch_interval)
 
     async def _recv_loop():
         try:
-            while True:
+            while not stop_event.is_set():
                 await ws.receive_text()
-        except WebSocketDisconnect:
+        except Exception:
             pass
         finally:
             stop_event.set()
