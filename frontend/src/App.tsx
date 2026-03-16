@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { Cpu } from 'lucide-react'
+import { Cpu, Loader2, RefreshCw } from 'lucide-react'
+import { useDevices } from './hooks/useDevices'
 
 function App() {
   const [devicesOpen, setDevicesOpen] = useState(false)
+  const { devices, status, refresh } = useDevices(devicesOpen)
 
   return (
     <div className="flex flex-col h-screen">
@@ -26,8 +28,47 @@ function App() {
         {/* Devices side pane */}
         {devicesOpen && (
           <div className="w-64 border-r border-border bg-background p-4 overflow-y-auto">
-            <h2 className="text-sm font-medium text-muted-foreground mb-3">Devices</h2>
-            <p className="text-sm text-muted-foreground">No devices connected.</p>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-medium text-muted-foreground">Devices</h2>
+              <button
+                onClick={refresh}
+                disabled={status === 'searching'}
+                className="inline-flex items-center justify-center rounded-md size-6 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className="size-3.5" />
+              </button>
+            </div>
+
+            {status === 'searching' && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-3.5 animate-spin" />
+                Searching...
+              </div>
+            )}
+
+            {status === 'ready' && devices.length === 0 && (
+              <p className="text-sm text-muted-foreground">No devices found.</p>
+            )}
+
+            {status === 'ready' && devices.length > 0 && (
+              <ul className="space-y-2">
+                {devices.map((d) => (
+                  <li key={d.serial} className="rounded-md border border-border p-2">
+                    <div className="text-sm font-medium">{d.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {d.host}:{d.port}
+                    </div>
+                    <div className="text-xs text-muted-foreground">{d.serial}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {status === 'error' && (
+              <p className="text-sm text-destructive">
+                Failed to reach discovery service.
+              </p>
+            )}
           </div>
         )}
 
