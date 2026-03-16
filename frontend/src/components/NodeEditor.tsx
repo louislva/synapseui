@@ -18,6 +18,7 @@ import {
   CanvasContextMenu,
   NodeContextMenu,
 } from "./NodeContextMenu"
+import { AddNodeButton } from "./AddNodeButton"
 import { Button } from "./ui/button"
 
 type ContextMenu =
@@ -115,6 +116,7 @@ export function NodeEditor() {
       >
         <Background gap={16} size={1} />
         <Controls />
+        <AddNodeButton />
         <MiniMap
           nodeStrokeWidth={3}
           className="!bg-muted/50 !border-border"
