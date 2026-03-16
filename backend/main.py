@@ -36,12 +36,16 @@ class ConfigureRequest(BaseModel):
     connections: list[ConnectionPayload]
 
 
+from synapse.api.nodes.signal_config_pb2 import SignalConfig
+from synapse.client.nodes.spike_detector import ThresholderConfig
+
 _NODE_FACTORIES = {
     "broadband_source": lambda p: syn.BroadbandSource(
         peripheral_id=0,
         bit_width=int(p.get("bit_depth", 12)),
         sample_rate_hz=int(p.get("sample_rate_hz", 30000)),
         gain=1.0,
+        signal=SignalConfig(),
     ),
     "spectral_filter": lambda p: syn.SpectralFilter(
         method=str(p.get("filter_type", "butterworth")),
@@ -49,8 +53,11 @@ _NODE_FACTORIES = {
         high_cutoff_hz=float(p.get("high_cutoff_hz", 3000)),
     ),
     "spike_detector": lambda p: syn.SpikeDetector(
-        threshold=float(p.get("threshold_sigma", 4)),
-    ) if hasattr(syn, "SpikeDetector") else None,
+        samples_per_spike=48,
+        config=ThresholderConfig(
+            threshold_uV=int(p.get("threshold_sigma", 4)),
+        ),
+    ),
 }
 
 
