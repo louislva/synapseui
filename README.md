@@ -1,6 +1,6 @@
 # SynapseUI
 
-A visual interface for [Synapse](https://science-corporation.github.io/synapse/) — build signal chains, manage devices, and stream data, all from your browser.
+A visual interface for [Synapse](https://science.xyz/technologies/synapse) — build signal chains, manage devices, and stream data, all from your browser.
 
 SynapseUI makes it easy to get started with Synapse by letting you spin up simulators, visually wire together signal processing nodes, deploy configurations to devices, and monitor live data streams — no code required.
 
