@@ -24,6 +24,12 @@ import { OnboardingOverlay, useOnboarding } from "./components/OnboardingOverlay
 import { DeviceHint } from "./components/DeviceHint"
 import { serializeGraph, configHash } from "./lib/serialize"
 import { Button } from "./components/ui/button"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./components/ui/tooltip"
 
 function App() {
   const { showOnboarding, dismissOnboarding } = useOnboarding()
@@ -171,45 +177,65 @@ function App() {
 
           <DeviceDropdown devices={devices} />
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDeploy}
-            disabled={!canDeploy || deploying}
-            className={
-              !canDeploy && !deploying
-                ? "border-transparent text-muted-foreground opacity-50"
-                : ""
-            }
-          >
-            {deploying ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <Upload className="size-3.5" />
-            )}
-            {isDeployed ? "Deployed" : "Deploy"}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger className="inline-flex">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDeploy}
+                  disabled={!canDeploy || deploying}
+                  className={
+                    !canDeploy && !deploying
+                      ? "border-transparent text-muted-foreground opacity-50"
+                      : ""
+                  }
+                >
+                  {deploying ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="size-3.5" />
+                  )}
+                  {isDeployed ? "Deployed" : "Deploy"}
+                </Button>
+              </TooltipTrigger>
+              {!selectedUri && !deploying && (
+                <TooltipContent side="bottom">
+                  Select a connected device first
+                </TooltipContent>
+              )}
+            </Tooltip>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleStartStop}
-            disabled={!selectedUri || startingStopping}
-            className={
-              !selectedUri && !startingStopping
-                ? "border-transparent text-muted-foreground opacity-50"
-                : ""
-            }
-          >
-            {startingStopping ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : isRunning ? (
-              <Square className="size-3 fill-current" />
-            ) : (
-              <Play className="size-3.5 fill-current" />
-            )}
-            {isRunning ? "Stop" : "Start"}
-          </Button>
+            <Tooltip>
+              <TooltipTrigger className="inline-flex">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleStartStop}
+                  disabled={!selectedUri || startingStopping}
+                  className={
+                    !selectedUri && !startingStopping
+                      ? "border-transparent text-muted-foreground opacity-50"
+                      : ""
+                  }
+                >
+                  {startingStopping ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : isRunning ? (
+                    <Square className="size-3 fill-current" />
+                  ) : (
+                    <Play className="size-3.5 fill-current" />
+                  )}
+                  {isRunning ? "Stop" : "Start"}
+                </Button>
+              </TooltipTrigger>
+              {!selectedUri && !startingStopping && (
+                <TooltipContent side="bottom">
+                  Select a connected device first
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
 
           <Button
             variant="ghost"

@@ -1,7 +1,13 @@
-import { Loader2, Plus, RefreshCw, X } from "lucide-react"
+import { Info, Loader2, Plus, RefreshCw, X } from "lucide-react"
 import { useDeviceStore } from "../store/useDeviceStore"
 import { statusColor } from "../lib/status"
 import { Button } from "./ui/button"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip"
 import type { MergedDevice, DiscoveryStatus } from "../hooks/useDevices"
 
 interface DevicesSidebarProps {
@@ -23,6 +29,7 @@ export function DevicesSidebar({
   const selectDevice = useDeviceStore((s) => s.selectDevice)
 
   return (
+    <TooltipProvider>
     <div className="w-64 border-l border-border bg-background p-4 overflow-y-auto">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-medium text-muted-foreground">Devices</h2>
@@ -79,11 +86,6 @@ export function DevicesSidebar({
                       className={`inline-block size-1.5 rounded-full shrink-0 ${statusColor(d.status)}`}
                     />
                     <span className="truncate">{d.name}</span>
-                    {d.simulator && (
-                      <span className="shrink-0 text-[10px] font-medium text-blue-400 bg-blue-500/10 rounded px-1">
-                        SIM
-                      </span>
-                    )}
                   </div>
                   {d.simulator && (
                     <Button
@@ -100,8 +102,37 @@ export function DevicesSidebar({
                     </Button>
                   )}
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {d.uri} · {d.status}
+                {d.simulator && (
+                  <div className="flex items-center gap-1 text-xs text-blue-400 mt-0.5">
+                    <span>Simulator</span>
+                    <Tooltip>
+                      <TooltipTrigger className="inline-flex cursor-help">
+                        <Info className="size-3" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        A virtual device running locally for development and testing. It emulates a real Synapse device.
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                )}
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <span>{d.uri} · {d.status}</span>
+                  <Tooltip>
+                    <TooltipTrigger className="inline-flex cursor-help">
+                      <Info className="size-3" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      {d.status === "Running"
+                        ? "Device is actively streaming data."
+                        : d.status === "Stopped"
+                          ? "Device is configured but not streaming. Press Start to begin."
+                          : d.status === "Starting..."
+                            ? "Simulator is launching..."
+                            : d.status === "Error"
+                              ? "Device encountered an error."
+                              : `Device state: ${d.status}`}
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
                 {d.simulator && (
                   <div className="text-xs text-muted-foreground">
@@ -125,5 +156,6 @@ export function DevicesSidebar({
         </p>
       )}
     </div>
+    </TooltipProvider>
   )
 }

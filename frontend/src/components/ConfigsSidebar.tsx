@@ -1,7 +1,13 @@
 import { useState } from "react"
-import { Plus, Copy, Trash2, Check, X } from "lucide-react"
+import { Info, Plus, Copy, Trash2, Check, X } from "lucide-react"
 import { useConfigStore } from "../store/useConfigStore"
 import { Button } from "./ui/button"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip"
 
 export function ConfigsSidebar() {
   const { configs, activeConfigId, createConfig, setActiveConfig, deleteConfig, duplicateConfig, renameConfig } =
@@ -24,7 +30,19 @@ export function ConfigsSidebar() {
   return (
     <div className="w-64 border-r border-border bg-background p-4 overflow-y-auto">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-medium text-muted-foreground">Configs</h2>
+        <h2 className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+          Configs
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger className="inline-flex cursor-help">
+                <Info className="size-3 text-muted-foreground" />
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                Configs define your signal chain — they can be deployed and run on any Synapse device.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </h2>
         <Button
           variant="ghost"
           size="icon-xs"
