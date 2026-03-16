@@ -4,7 +4,7 @@ A visual interface for [Synapse](https://science-corporation.github.io/synapse/)
 
 SynapseUI makes it easy to get started with Synapse by letting you spin up simulators, visually wire together signal processing nodes, deploy configurations to devices, and monitor live data streams — no code required.
 
-![Signal chain editor](docs/screenshots/signal-chain.png)
+![Full UI with node editing and device management](docs/screenshots/full-ui.png)
 
 ## Features
 
@@ -14,8 +14,6 @@ SynapseUI makes it easy to get started with Synapse by letting you spin up simul
 - **One-click deploy** — Deploy signal chain configurations to devices with a single click
 - **Live data streaming** — Stream and visualize tap data from running devices in real time
 - **Config management** — Save, load, and switch between multiple signal chain configurations
-
-![Full UI with parameter editing and device management](docs/screenshots/full-ui.png)
 
 ## Prerequisites
 
@@ -69,7 +67,7 @@ Then open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ## Tech Stack
 
-| Layer    | Stack |
-|----------|-------|
+| Layer    | Stack                                                                                              |
+| -------- | -------------------------------------------------------------------------------------------------- |
 | Frontend | React 19, TypeScript, Vite, [React Flow](https://reactflow.dev/), Zustand, Tailwind CSS, shadcn/ui |
-| Backend  | Python, FastAPI, Uvicorn, [science-synapse](https://science-corporation.github.io/synapse/) |
+| Backend  | Python, FastAPI, Uvicorn, [science-synapse](https://science-corporation.github.io/synapse/)        |
