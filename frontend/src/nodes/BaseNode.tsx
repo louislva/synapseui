@@ -65,7 +65,7 @@ export function BaseNode({ data, selected }: NodeProps & { data: NodeData }) {
             className="inline-flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
           >
             <Radio className="size-2.5" />
-            <span>Stream</span>
+            <span className="underline">Stream</span>
           </button>
         </div>
       )}
