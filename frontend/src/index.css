@@ -127,3 +127,16 @@
     @apply font-sans;
     }
 }
+
+/* React Flow theme overrides */
+.react-flow {
+  --xy-background-color: var(--background);
+  --xy-node-border-radius: var(--radius);
+  --xy-minimap-background: var(--muted);
+  --xy-controls-button-background: var(--background);
+  --xy-controls-button-color: var(--foreground);
+  --xy-controls-button-border-color: var(--border);
+  --xy-edge-stroke: var(--muted-foreground);
+  --xy-edge-stroke-selected: var(--ring);
+  --xy-connectionline-stroke: var(--ring);
+}
