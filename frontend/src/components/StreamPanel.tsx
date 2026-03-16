@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { ChevronDown, X } from "lucide-react"
 import { useDeviceStore } from "../store/useDeviceStore"
+import { ChannelRingBuffer } from "../lib/ringBuffer"
+import { TextLog } from "./stream/TextLog"
+import { HeatmapView } from "./stream/HeatmapView"
+import { WaveformView } from "./stream/WaveformView"
+import { FFTView } from "./stream/FFTView"
 
 interface TapInfo {
   name: string
@@ -19,6 +24,15 @@ interface StreamMessage {
 
 const MAX_MESSAGES = 200
 
+type ViewMode = "text" | "heatmap" | "waveform" | "fft"
+
+const VIEW_LABELS: Record<ViewMode, string> = {
+  text: "Text",
+  heatmap: "Heatmap",
+  waveform: "Waveform",
+  fft: "FFT",
+}
+
 export function StreamPanel({ onClose }: { onClose: () => void }) {
   const selectedUri = useDeviceStore((s) => s.selectedUri)
   const [taps, setTaps] = useState<TapInfo[]>([])
@@ -29,12 +43,13 @@ export function StreamPanel({ onClose }: { onClose: () => void }) {
   const [reconnecting, setReconnecting] = useState(false)
   const [frameCount, setFrameCount] = useState(0)
   const [fps, setFps] = useState(0)
+  const [viewMode, setViewMode] = useState<ViewMode>("text")
   const wsRef = useRef<WebSocket | null>(null)
-  const logRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const fpsCountRef = useRef(0)
   const fpsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const selectedTapRef = useRef(selectedTap)
+  const bufferRef = useRef<ChannelRingBuffer | null>(null)
 
   // Keep ref in sync so ws.onclose can read current value
   useEffect(() => {
@@ -134,6 +149,7 @@ export function StreamPanel({ onClose }: { onClose: () => void }) {
           ])
         } else {
           setMessages([])
+          bufferRef.current = null
         }
         setFrameCount(0)
         fpsCountRef.current = 0
@@ -164,6 +180,16 @@ export function StreamPanel({ onClose }: { onClose: () => void }) {
           const lines = msg.frames.map((f) => {
             if (f.type === "broadband") {
               const samples = f.frame_data as number[]
+              const numCh = f.num_channels as number
+              const rate = f.sample_rate_hz as number
+
+              // Push into ring buffer for canvas views
+              if (!bufferRef.current || bufferRef.current.numChannels !== numCh) {
+                bufferRef.current = new ChannelRingBuffer(numCh)
+              }
+              bufferRef.current.sampleRate = rate
+              bufferRef.current.push(samples, numCh)
+
               const preview = samples
                 .slice(0, 8)
                 .map((s) => String(s).padStart(5))
@@ -201,13 +227,6 @@ export function StreamPanel({ onClose }: { onClose: () => void }) {
     }
   }, [taps, selectedTap, connected, reconnecting, connectToTap])
 
-  // Auto-scroll log
-  useEffect(() => {
-    if (logRef.current) {
-      logRef.current.scrollTop = logRef.current.scrollHeight
-    }
-  }, [messages])
-
   // Disconnect on unmount
   useEffect(() => {
     return () => {
@@ -225,6 +244,7 @@ export function StreamPanel({ onClose }: { onClose: () => void }) {
       disconnect()
       setMessages([])
       setFrameCount(0)
+      bufferRef.current = null
     } else {
       connectToTap(tapName)
     }
@@ -314,6 +334,23 @@ export function StreamPanel({ onClose }: { onClose: () => void }) {
           </span>
         )}
 
+        {/* View mode selector */}
+        <div className="inline-flex items-center rounded-md border border-border overflow-hidden">
+          {(["text", "heatmap", "waveform", "fft"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              className={`px-2 h-5 text-[10px] font-medium transition-colors ${
+                viewMode === mode
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
+              }`}
+            >
+              {VIEW_LABELS[mode]}
+            </button>
+          ))}
+        </div>
+
         <button
           onClick={onClose}
           className="inline-flex items-center justify-center rounded-md size-5 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
@@ -322,32 +359,16 @@ export function StreamPanel({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
-      {/* Log area */}
-      <div
-        ref={logRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden p-2 font-mono text-[11px] leading-[1.4] text-foreground/80"
-      >
-        {messages.length === 0 ? (
-          <div className="text-muted-foreground">
-            {selectedUri
-              ? "Select a tap to start streaming..."
-              : "No device selected"}
-          </div>
-        ) : (
-          messages.map((msg, i) => (
-            <div
-              key={i}
-              className={
-                msg.startsWith("---")
-                  ? "text-center text-muted-foreground/50 text-[10px] py-1"
-                  : "whitespace-nowrap"
-              }
-            >
-              {msg}
-            </div>
-          ))
-        )}
-      </div>
+      {/* Content area */}
+      {viewMode === "text" ? (
+        <TextLog messages={messages} selectedUri={selectedUri} />
+      ) : viewMode === "heatmap" ? (
+        <HeatmapView buffer={bufferRef.current} />
+      ) : viewMode === "waveform" ? (
+        <WaveformView buffer={bufferRef.current} />
+      ) : (
+        <FFTView buffer={bufferRef.current} />
+      )}
     </div>
   )
 }
