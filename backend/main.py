@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from coolname import generate_slug
 import synapse as syn
 from synapse.api.datatype_pb2 import BroadbandFrame
+from synapse.api.nodes.spectral_filter_pb2 import SpectralFilterMethod
 from synapse.api.status_pb2 import DeviceState
 from synapse.client.taps import Tap
 from synapse.utils.discover import discover
@@ -105,7 +106,7 @@ def _make_spike_source(p: dict):
 _NODE_FACTORIES = {
     "broadband_source": _make_broadband_source,
     "spectral_filter": lambda p: syn.SpectralFilter(
-        method=str(p.get("filter_type", "butterworth")),
+        method=SpectralFilterMethod.Value(str(p.get("method", "kBandPass"))),
         low_cutoff_hz=float(p.get("low_cutoff_hz", 300)),
         high_cutoff_hz=float(p.get("high_cutoff_hz", 3000)),
     ),

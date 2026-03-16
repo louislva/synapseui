@@ -71,14 +71,15 @@ export const NODE_TYPE_DEFS: Record<string, NodeTypeDef> = {
     ],
     params: [
       {
-        key: "filter_type",
-        label: "Filter Type",
+        key: "method",
+        label: "Method",
         type: "select",
-        default: "butterworth",
+        default: "kBandPass",
         options: [
-          { label: "Butterworth", value: "butterworth" },
-          { label: "Chebyshev", value: "chebyshev" },
-          { label: "Bessel", value: "bessel" },
+          { label: "Low Pass", value: "kLowPass" },
+          { label: "High Pass", value: "kHighPass" },
+          { label: "Band Pass", value: "kBandPass" },
+          { label: "Band Stop", value: "kBandStop" },
         ],
       },
       {
