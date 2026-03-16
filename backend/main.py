@@ -35,8 +35,8 @@ class SimulatorInfo:
 _simulators: dict[str, SimulatorInfo] = {}
 _next_sim_id = 0
 _allocated_ports: set[int] = set()
-_BASE_RPC_PORT = 647
-_DISCOVERY_PORT_OFFSET = 5823  # 6470 - 647
+_BASE_RPC_PORT = 10647
+_DISCOVERY_PORT_OFFSET = 5823  # discovery = rpc + 5823
 
 
 def _next_available_port() -> int:
@@ -139,23 +139,32 @@ def _get_device_status(uri: str) -> str:
 
 @app.get("/api/devices")
 async def get_devices():
-    devices = await asyncio.to_thread(discover, timeout_sec=1)
-    statuses = await asyncio.gather(
-        *(asyncio.to_thread(_get_device_status, f"{d.host}:{d.port}") for d in devices)
-    )
-    sim_by_uri = {
-        info.uri: (sim_id, info) for sim_id, info in _simulators.items()
+    # Build device list from known simulators (fast) + network discovery (slow).
+    # We kick off discovery in the background but don't block on it for long.
+    known_uris: dict[str, tuple[str, SimulatorInfo]] = {
+        info.uri: (sim_id, info)
+        for sim_id, info in _simulators.items()
+        if info.proc.poll() is None  # still running
     }
+
+    # Query status of known simulators directly (no broadcast needed)
+    sim_statuses = await asyncio.gather(
+        *(asyncio.to_thread(_get_device_status, uri) for uri in known_uris)
+    )
+
     result = []
-    for d, s in zip(devices, statuses):
-        dd = asdict(d)
-        dd["uri"] = f"{d.host}:{d.port}"
-        dd["status"] = s
-        sim_match = sim_by_uri.get(dd["uri"])
-        if sim_match:
-            sim_id, info = sim_match
-            dd["simulator"] = {"id": sim_id, "pid": info.proc.pid, "name": info.name}
-        result.append(dd)
+    for (uri, (sim_id, info)), status in zip(known_uris.items(), sim_statuses):
+        host, port = uri.rsplit(":", 1)
+        result.append({
+            "uri": uri,
+            "host": host,
+            "port": int(port),
+            "name": info.name,
+            "serial": "",
+            "status": status,
+            "simulator": {"id": sim_id, "pid": info.proc.pid, "name": info.name},
+        })
+
     return {"devices": result}
 
 
