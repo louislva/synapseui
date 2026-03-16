@@ -20,10 +20,13 @@ import { DevicesSidebar } from "./components/DevicesSidebar"
 import { DeviceDropdown } from "./components/DeviceDropdown"
 import { ParameterPanel } from "./components/ParameterPanel"
 import { StreamPanel } from "./components/StreamPanel"
+import { OnboardingOverlay, useOnboarding } from "./components/OnboardingOverlay"
+import { DeviceHint } from "./components/DeviceHint"
 import { serializeGraph, configHash } from "./lib/serialize"
 import { Button } from "./components/ui/button"
 
 function App() {
+  const { showOnboarding, dismissOnboarding } = useOnboarding()
   const [configsOpen, setConfigsOpen] = useState(true)
   const [devicesOpen, setDevicesOpen] = useState(false)
   const [streamOpen, setStreamOpen] = useState(false)
@@ -247,6 +250,9 @@ function App() {
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
             <div className="relative flex-1 min-h-0">
               <NodeEditor />
+              {activeConfigId && !selectedUri && (
+                <DeviceHint onOpenDevices={() => setDevicesOpen(true)} />
+              )}
             </div>
             {streamOpen && (
               <StreamPanel onClose={() => setStreamOpen(false)} />
@@ -264,6 +270,13 @@ function App() {
           )}
         </div>
       </div>
+      {showOnboarding && (
+        <OnboardingOverlay
+          onOpenConfigs={() => setConfigsOpen(true)}
+          onOpenDevices={() => setDevicesOpen(true)}
+          onDismiss={dismissOnboarding}
+        />
+      )}
     </ReactFlowProvider>
   )
 }
