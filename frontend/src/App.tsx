@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Cpu } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 
 function App() {
   const [devicesOpen, setDevicesOpen] = useState(false)
@@ -9,14 +8,17 @@ function App() {
     <div className="flex flex-col h-screen">
       {/* Toolbar */}
       <div className="flex items-center h-11 px-3 border-b border-border bg-background">
-        <Button
-          variant={devicesOpen ? 'outline' : 'ghost'}
-          size="sm"
+        <button
           onClick={() => setDevicesOpen(!devicesOpen)}
+          className={`inline-flex items-center gap-1.5 rounded-md px-2.5 h-7 text-sm font-medium transition-colors ${
+            devicesOpen
+              ? 'bg-muted text-foreground'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+          }`}
         >
           <Cpu className="size-3.5" />
           Devices
-        </Button>
+        </button>
       </div>
 
       {/* Main area */}
