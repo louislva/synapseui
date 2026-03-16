@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
+from coolname import generate_slug
 import synapse as syn
 from synapse.api.datatype_pb2 import BroadbandFrame
 from synapse.api.status_pb2 import DeviceState
@@ -101,11 +102,6 @@ class SimulatorRequest(BaseModel):
     serial: str | None = None
     rpc_port: int | None = None
     discovery_port: int | None = None
-
-    def safe_name(self, fallback: str) -> str:
-        if self.name is None:
-            return fallback
-        return self.name.replace(" ", "-")
 
 
 def _get_device_status(uri: str) -> str:
@@ -222,7 +218,7 @@ async def launch_simulator(req: SimulatorRequest):
 
     rpc_port = req.rpc_port if req.rpc_port is not None else _next_available_port()
     discovery_port = req.discovery_port if req.discovery_port is not None else rpc_port + _DISCOVERY_PORT_OFFSET
-    name = req.safe_name(f"simulator-{sim_id}")
+    name = req.name or generate_slug(3)
     uri = f"127.0.0.1:{rpc_port}"
 
     cmd = [
@@ -281,17 +277,20 @@ async def list_taps(uri: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list taps: {e}")
 
-    return {
-        "taps": [
-            {
+    # Deduplicate by name (simulator reports same name for multiple nodes)
+    seen: set[str] = set()
+    unique = []
+    for t in taps:
+        if t.name not in seen:
+            seen.add(t.name)
+            unique.append({
                 "name": t.name,
                 "message_type": t.message_type,
                 "endpoint": t.endpoint,
                 "tap_type": t.tap_type,
-            }
-            for t in taps
-        ]
-    }
+            })
+
+    return {"taps": unique}
 
 
 def _decode_frame(raw: bytes, message_type: str) -> dict | None:
