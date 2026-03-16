@@ -30,9 +30,9 @@ export type OnboardingTarget = "center" | "configs" | "configs-plus" | "devices"
 function StepControls({
   step,
   totalSteps,
-  onNext,
-  onBack,
-  onDismiss,
+  onNext: _onNext,
+  onBack: _onBack,
+  onDismiss: _onDismiss,
 }: {
   step: number
   totalSteps: number
