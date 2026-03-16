@@ -81,17 +81,6 @@ export function NodeContextMenu({ x, y, nodeId, onClose }: NodeMenuProps) {
         variant="ghost"
         size="sm"
         onClick={() => {
-          // Placeholder — will open live data viewer later
-          onClose()
-        }}
-        className="w-full justify-start"
-      >
-        Tap Output
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => {
           removeNode(nodeId)
           onClose()
         }}
