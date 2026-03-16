@@ -15,21 +15,40 @@
 - `npm run lint` — ESLint
 - `npm run preview` — Preview production build
 
+### Key Libraries
+
+- **@xyflow/react** (React Flow v12) — node graph editor for signal chain canvas
+- **zustand** v5 — state management (graph store, config store, device store)
+- **Tailwind CSS** v4.2 + shadcn/ui — styling and components
+- **lucide-react** — icons
+
 ### Project Structure
 
 ```
-frontend/
-├── src/
-│   ├── main.tsx        # App entry point
-│   ├── App.tsx         # Root component
-│   ├── App.css         # App styles
-│   ├── index.css       # Global styles
-│   └── assets/         # Static assets (images, SVGs)
-├── vite.config.ts      # Vite config (React plugin)
-├── tsconfig.json       # TS project references
-├── tsconfig.app.json   # App TS config
-├── tsconfig.node.json  # Node/Vite TS config
-└── eslint.config.js    # ESLint flat config
+frontend/src/
+├── main.tsx                    # App entry point
+├── App.tsx                     # Root component: toolbar, sidebars, canvas layout
+├── index.css                   # Global styles + React Flow theme overrides
+├── store/
+│   ├── useGraphStore.ts        # Zustand: nodes, edges, selection, CRUD, DAG validation
+│   ├── useConfigStore.ts       # Zustand: saved configs (localStorage), active config
+│   └── useDeviceStore.ts       # Zustand: selected device URI, deployed config hashes
+├── nodes/
+│   ├── types.ts                # Node type registry (NodeTypeDef, ParamDef, NodeData)
+│   ├── BaseNode.tsx            # Generic React Flow node component (all types)
+│   └── index.ts                # nodeTypes map for React Flow
+├── components/
+│   ├── NodeEditor.tsx          # React Flow canvas + background + controls + minimap
+│   ├── NodeContextMenu.tsx     # Right-click menus (canvas: add node, node: tap/delete)
+│   ├── ConfigsSidebar.tsx      # Left sidebar: saved configs list
+│   └── ParameterPanel.tsx      # Right panel: edit selected node parameters
+├── hooks/
+│   └── useDevices.ts           # Device discovery polling + simulator management
+├── lib/
+│   ├── serialize.ts            # Graph → backend config JSON + config hashing
+│   └── utils.ts                # cn() classname utility
+└── components/ui/
+    └── button.tsx              # shadcn Button component
 ```
 
 ## Backend
@@ -46,15 +65,30 @@ frontend/
 
 ### API Endpoints
 
-- `GET /api/devices` — Discover and return available Synapse devices
+- `GET /api/devices` — Discover devices (returns `uri`, name, serial, status)
+- `POST /api/devices/configure?uri=<host:port>` — Deploy signal chain config to device
+- `POST /api/devices/start?uri=<host:port>` — Start device (returns new status)
+- `POST /api/devices/stop?uri=<host:port>` — Stop device (returns new status)
+- `GET /api/simulators` — List running simulators
+- `POST /api/simulators` — Launch a simulator
+- `DELETE /api/simulators/{id}` — Kill a simulator
 
 ### Project Structure
 
 ```
 backend/
-├── main.py          # FastAPI app with device discovery endpoint
+├── main.py          # FastAPI app with all endpoints
 └── pyproject.toml   # Project config and dependencies
 ```
+
+### Synapse Library Notes
+
+- `syn.Device(uri)` connects directly — no discovery needed when you have `host:port`
+- Device identification uses `uri` (`host:port`) everywhere, not serial
+- `device.configure(config)`, `device.start()`, `device.stop()` are the core control methods
+- `discover()` broadcasts on the network and is slow (~1s timeout); avoid in hot paths
+- Node types: `syn.BroadbandSource`, `syn.SpectralFilter`, `syn.SpikeDetector`
+- Device states: Unknown, Initializing, Stopped, Running, Error (from `DeviceState` protobuf)
 
 ## Simulator
 

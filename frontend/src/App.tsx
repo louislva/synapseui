@@ -5,8 +5,10 @@ import {
   Cpu,
   FileSliders,
   Loader2,
+  Play,
   Plus,
   RefreshCw,
+  Square,
   Upload,
   X,
 } from "lucide-react"
@@ -17,7 +19,7 @@ import { useDeviceStore } from "./store/useDeviceStore"
 import { NodeEditor } from "./components/NodeEditor"
 import { ConfigsSidebar } from "./components/ConfigsSidebar"
 import { ParameterPanel } from "./components/ParameterPanel"
-import { serializeGraph } from "./lib/serialize"
+import { serializeGraph, configHash } from "./lib/serialize"
 import type { Device } from "./hooks/useDevices"
 
 function statusColor(status: string) {
@@ -35,20 +37,18 @@ function statusColor(status: string) {
 }
 
 function DeviceDropdown({ devices }: { devices: Device[] }) {
-  const { selectedSerial, selectDevice } = useDeviceStore()
+  const { selectedUri, selectDevice } = useDeviceStore()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  const selected = devices.find((d) => d.serial === selectedSerial)
+  const selected = devices.find((d) => d.uri === selectedUri)
 
-  // Auto-select first device if current selection is gone
   useEffect(() => {
-    if (selectedSerial && !devices.find((d) => d.serial === selectedSerial)) {
-      selectDevice(devices.length > 0 ? devices[0].serial : null)
+    if (selectedUri && !devices.find((d) => d.uri === selectedUri)) {
+      selectDevice(devices.length > 0 ? devices[0].uri : null)
     }
-  }, [devices, selectedSerial, selectDevice])
+  }, [devices, selectedUri, selectDevice])
 
-  // Close on outside click
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
@@ -68,7 +68,9 @@ function DeviceDropdown({ devices }: { devices: Device[] }) {
       >
         {selected ? (
           <>
-            <span className={`size-1.5 rounded-full ${statusColor(selected.status)}`} />
+            <span
+              className={`size-1.5 rounded-full ${statusColor(selected.status)}`}
+            />
             <span className="max-w-[120px] truncate">{selected.name}</span>
           </>
         ) : (
@@ -86,20 +88,24 @@ function DeviceDropdown({ devices }: { devices: Device[] }) {
           ) : (
             devices.map((d) => (
               <button
-                key={d.serial}
+                key={d.uri}
                 onClick={() => {
-                  selectDevice(d.serial)
+                  selectDevice(d.uri)
                   setOpen(false)
                 }}
                 className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors ${
-                  d.serial === selectedSerial
+                  d.uri === selectedUri
                     ? "bg-muted text-foreground"
                     : "hover:bg-muted/50"
                 }`}
               >
-                <span className={`size-1.5 rounded-full ${statusColor(d.status)}`} />
+                <span
+                  className={`size-1.5 rounded-full ${statusColor(d.status)}`}
+                />
                 <span className="flex-1 text-left truncate">{d.name}</span>
-                <span className="text-[10px] text-muted-foreground">{d.serial}</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {d.uri}
+                </span>
               </button>
             ))
           )}
@@ -112,24 +118,85 @@ function DeviceDropdown({ devices }: { devices: Device[] }) {
 function App() {
   const [configsOpen, setConfigsOpen] = useState(true)
   const [devicesOpen, setDevicesOpen] = useState(false)
-  const { devices, status, simulators, refresh, launchSimulator, killSimulator } =
-    useDevices(true)
+  const [deploying, setDeploying] = useState(false)
+  const [startingStopping, setStartingStopping] = useState(false)
+  const {
+    devices,
+    status,
+    simulators,
+    refresh,
+    launchSimulator,
+    killSimulator,
+    updateDeviceStatus,
+  } = useDevices(true)
 
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId)
   const nodes = useGraphStore((s) => s.nodes)
   const edges = useGraphStore((s) => s.edges)
   const activeConfigId = useConfigStore((s) => s.activeConfigId)
   const saveActiveConfig = useConfigStore((s) => s.saveActiveConfig)
-  const selectedSerial = useDeviceStore((s) => s.selectedSerial)
+  const selectedUri = useDeviceStore((s) => s.selectedUri)
   const selectDevice = useDeviceStore((s) => s.selectDevice)
+  const deployedHashes = useDeviceStore((s) => s.deployedHashes)
+  const setDeployedHash = useDeviceStore((s) => s.setDeployedHash)
 
-  const handleDeploy = () => {
-    saveActiveConfig()
-    const payload = serializeGraph(nodes, edges)
-    console.log(
-      `Deploy to device ${selectedSerial}:`,
-      JSON.stringify(payload, null, 2),
-    )
+  const selectedDevice = devices.find((d) => d.uri === selectedUri)
+  const isRunning = selectedDevice?.status === "Running"
+
+  const currentHash = configHash(nodes, edges)
+  const isDeployed =
+    selectedUri != null && deployedHashes[selectedUri] === currentHash
+  const canDeploy =
+    !!activeConfigId && nodes.length > 0 && !!selectedUri && !isDeployed
+
+  const handleDeploy = async () => {
+    if (!selectedUri || !canDeploy) return
+    setDeploying(true)
+    try {
+      saveActiveConfig()
+      const payload = serializeGraph(nodes, edges)
+      const res = await fetch(
+        `/api/devices/configure?uri=${encodeURIComponent(selectedUri)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      )
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        console.error("Deploy failed:", err)
+        return
+      }
+      setDeployedHash(selectedUri, currentHash)
+    } catch (e) {
+      console.error("Deploy failed:", e)
+    } finally {
+      setDeploying(false)
+    }
+  }
+
+  const handleStartStop = async () => {
+    if (!selectedUri) return
+    setStartingStopping(true)
+    try {
+      const action = isRunning ? "stop" : "start"
+      const res = await fetch(
+        `/api/devices/${action}?uri=${encodeURIComponent(selectedUri)}`,
+        { method: "POST" },
+      )
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        console.error(`${action} failed:`, err)
+        return
+      }
+      const data = await res.json()
+      updateDeviceStatus(selectedUri, data.status)
+    } catch (e) {
+      console.error("Start/stop failed:", e)
+    } finally {
+      setStartingStopping(false)
+    }
   }
 
   return (
@@ -152,16 +219,43 @@ function App() {
 
           <div className="flex-1" />
 
-          {/* Center: Device selector + Deploy */}
+          {/* Center: Device selector + Deploy + Start/Stop */}
           <DeviceDropdown devices={devices} />
 
           <button
             onClick={handleDeploy}
-            disabled={!activeConfigId || nodes.length === 0 || !selectedSerial}
-            className="inline-flex items-center gap-1.5 rounded-md px-3 h-7 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+            disabled={!canDeploy || deploying}
+            className={`inline-flex items-center gap-1.5 rounded-md px-2.5 h-7 text-sm font-medium transition-colors border ${
+              canDeploy
+                ? "border-border text-foreground hover:bg-muted"
+                : "border-transparent text-muted-foreground opacity-50"
+            } disabled:pointer-events-none`}
           >
-            <Upload className="size-3.5" />
-            Deploy
+            {deploying ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Upload className="size-3.5" />
+            )}
+            {isDeployed ? "Deployed" : "Deploy"}
+          </button>
+
+          <button
+            onClick={handleStartStop}
+            disabled={!selectedUri || startingStopping}
+            className={`inline-flex items-center gap-1.5 rounded-md px-2.5 h-7 text-sm font-medium transition-colors border ${
+              selectedUri
+                ? "border-border text-foreground hover:bg-muted"
+                : "border-transparent text-muted-foreground opacity-50"
+            } disabled:pointer-events-none`}
+          >
+            {startingStopping ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : isRunning ? (
+              <Square className="size-3 fill-current" />
+            ) : (
+              <Play className="size-3.5 fill-current" />
+            )}
+            {isRunning ? "Stop" : "Start"}
           </button>
 
           <div className="flex-1" />
@@ -224,10 +318,10 @@ function App() {
                 <ul className="space-y-2">
                   {devices.map((d) => (
                     <li
-                      key={d.serial}
-                      onClick={() => selectDevice(d.serial)}
+                      key={d.uri}
+                      onClick={() => selectDevice(d.uri)}
                       className={`rounded-md border p-2 cursor-pointer transition-colors ${
-                        d.serial === selectedSerial
+                        d.uri === selectedUri
                           ? "border-ring bg-muted/50"
                           : "border-border hover:bg-muted/30"
                       }`}
@@ -239,7 +333,7 @@ function App() {
                         {d.name}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {d.host}:{d.port} · {d.status}
+                        {d.uri} · {d.status}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {d.serial}

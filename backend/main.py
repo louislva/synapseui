@@ -20,6 +20,40 @@ _simulators: dict[str, subprocess.Popen] = {}
 _next_sim_id = 0
 
 
+class NodePayload(BaseModel):
+    id: str
+    type: str
+    params: dict
+
+
+class ConnectionPayload(BaseModel):
+    source: str  # source node id
+    target: str  # target node id
+
+
+class ConfigureRequest(BaseModel):
+    nodes: list[NodePayload]
+    connections: list[ConnectionPayload]
+
+
+_NODE_FACTORIES = {
+    "broadband_source": lambda p: syn.BroadbandSource(
+        peripheral_id=0,
+        bit_width=int(p.get("bit_depth", 12)),
+        sample_rate_hz=int(p.get("sample_rate_hz", 30000)),
+        gain=1.0,
+    ),
+    "spectral_filter": lambda p: syn.SpectralFilter(
+        method=str(p.get("filter_type", "butterworth")),
+        low_cutoff_hz=float(p.get("low_cutoff_hz", 300)),
+        high_cutoff_hz=float(p.get("high_cutoff_hz", 3000)),
+    ),
+    "spike_detector": lambda p: syn.SpikeDetector(
+        threshold=float(p.get("threshold_sigma", 4)),
+    ) if hasattr(syn, "SpikeDetector") else None,
+}
+
+
 class SimulatorRequest(BaseModel):
     name: str | None = None
     serial: str | None = None
@@ -32,9 +66,9 @@ class SimulatorRequest(BaseModel):
         return self.name.replace(" ", "-")
 
 
-def _get_device_status(host: str, port: int) -> str:
+def _get_device_status(uri: str) -> str:
     try:
-        device = syn.Device(f"{host}:{port}")
+        device = syn.Device(uri)
         info = device.info()
         return _STATE_NAMES.get(info.status.state, "Unknown")
     except Exception:
@@ -43,13 +77,74 @@ def _get_device_status(host: str, port: int) -> str:
 
 @app.get("/api/devices")
 async def get_devices():
-    devices = await asyncio.to_thread(discover, timeout_sec=5)
+    devices = await asyncio.to_thread(discover, timeout_sec=1)
+    statuses = await asyncio.gather(
+        *(asyncio.to_thread(_get_device_status, f"{d.host}:{d.port}") for d in devices)
+    )
     result = []
-    for d in devices:
+    for d, s in zip(devices, statuses):
         dd = asdict(d)
-        dd["status"] = await asyncio.to_thread(_get_device_status, d.host, d.port)
+        dd["uri"] = f"{d.host}:{d.port}"
+        dd["status"] = s
         result.append(dd)
     return {"devices": result}
+
+
+@app.post("/api/devices/configure")
+async def configure_device(uri: str, req: ConfigureRequest):
+    """Deploy a signal chain config to a device."""
+    device = syn.Device(uri)
+
+    config = syn.Config()
+    node_map: dict[str, object] = {}
+
+    for n in req.nodes:
+        factory = _NODE_FACTORIES.get(n.type)
+        if factory is None:
+            raise HTTPException(status_code=400, detail=f"Unknown node type: {n.type}")
+        node = factory(n.params)
+        if node is None:
+            raise HTTPException(status_code=400, detail=f"Node type not supported: {n.type}")
+        config.add_node(node)
+        node_map[n.id] = node
+
+    for c in req.connections:
+        src = node_map.get(c.source)
+        dst = node_map.get(c.target)
+        if src is None or dst is None:
+            raise HTTPException(status_code=400, detail="Invalid connection: node not found")
+        config.connect(src, dst)
+
+    try:
+        await asyncio.to_thread(device.configure, config)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Configure failed: {e}")
+
+    return {"status": "ok"}
+
+
+@app.post("/api/devices/start")
+async def start_device(uri: str):
+    """Start the signal chain on a device."""
+    device = syn.Device(uri)
+    try:
+        await asyncio.to_thread(device.start)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Start failed: {e}")
+    status = await asyncio.to_thread(_get_device_status, uri)
+    return {"status": status}
+
+
+@app.post("/api/devices/stop")
+async def stop_device(uri: str):
+    """Stop the signal chain on a device."""
+    device = syn.Device(uri)
+    try:
+        await asyncio.to_thread(device.stop)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Stop failed: {e}")
+    status = await asyncio.to_thread(_get_device_status, uri)
+    return {"status": status}
 
 
 @app.get("/api/simulators")

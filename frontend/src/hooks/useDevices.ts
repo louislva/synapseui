@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react"
 
 export interface Device {
+  uri: string
   host: string
   port: number
   capability: string
@@ -17,7 +18,7 @@ export interface Simulator {
 
 type DiscoveryStatus = "searching" | "ready" | "error"
 
-export function useDevices(enabled: boolean, intervalMs = 30_000) {
+export function useDevices(enabled: boolean, intervalMs = 5_000) {
   const [devices, setDevices] = useState<Device[]>([])
   const [status, setStatus] = useState<DiscoveryStatus>("searching")
   const [simulators, setSimulators] = useState<Simulator[]>([])
@@ -87,5 +88,11 @@ export function useDevices(enabled: boolean, intervalMs = 30_000) {
     }
   }, [fetchAll])
 
-  return { devices, status, simulators, refresh, launchSimulator, killSimulator }
+  const updateDeviceStatus = useCallback((uri: string, newStatus: string) => {
+    setDevices((prev) =>
+      prev.map((d) => (d.uri === uri ? { ...d, status: newStatus } : d)),
+    )
+  }, [])
+
+  return { devices, status, simulators, refresh, launchSimulator, killSimulator, updateDeviceStatus }
 }
