@@ -33,24 +33,14 @@ export function DevicesSidebar({
     <div className="w-64 border-l border-border bg-background p-4 overflow-y-auto">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-medium text-muted-foreground">Devices</h2>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            onClick={launchSimulator}
-            title="Launch simulator"
-          >
-            <Plus className="size-3.5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            onClick={refresh}
-            disabled={status === "searching"}
-          >
-            <RefreshCw className="size-3.5" />
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          onClick={refresh}
+          disabled={status === "searching"}
+        >
+          <RefreshCw className="size-3.5" />
+        </Button>
       </div>
 
       {status === "searching" && devices.length === 0 && (
@@ -155,6 +145,16 @@ export function DevicesSidebar({
           Failed to reach discovery service.
         </p>
       )}
+
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={launchSimulator}
+        className="w-full mt-3"
+      >
+        <Plus className="size-3.5 mr-1.5" />
+        Create simulator
+      </Button>
     </div>
     </TooltipProvider>
   )
