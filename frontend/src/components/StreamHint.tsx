@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react"
-import { ArrowUp } from "lucide-react"
 import { useDeviceStore } from "../store/useDeviceStore"
 import { Button } from "./ui/button"
 
@@ -29,11 +28,10 @@ export function StreamHint({ onOpenStream }: StreamHintProps) {
   }
 
   return (
-    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
-      <div className="rounded-lg border border-border bg-popover px-4 py-3 shadow-lg max-w-xs">
-        <div className="flex items-start gap-2">
-          <ArrowUp className="size-4 text-muted-foreground shrink-0 mt-0.5 animate-bounce" />
-          <div>
+    <div className="absolute top-full right-0 mt-2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
+      <div className="relative rounded-lg border border-border bg-popover px-4 py-3 shadow-lg max-w-xs">
+        <div className="absolute -top-[6px] right-6 size-3 rotate-45 border-l border-t border-border bg-popover" />
+        <div>
             <p className="text-sm text-foreground font-medium mb-1">
               Your device is running!
             </p>
@@ -63,7 +61,6 @@ export function StreamHint({ onOpenStream }: StreamHintProps) {
                 Dismiss
               </Button>
             </div>
-          </div>
         </div>
       </div>
     </div>

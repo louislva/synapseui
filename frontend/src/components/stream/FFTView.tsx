@@ -2,14 +2,17 @@ import { useState, useEffect, useRef } from "react"
 import type { ChannelRingBuffer } from "../../lib/ringBuffer"
 import { computePSD } from "../../lib/fft"
 import { ChevronUp, ChevronDown } from "lucide-react"
+import { StreamEmptyState } from "./StreamEmptyState"
 
 const FFT_SIZE = 1024
 
 interface FFTViewProps {
   buffer: ChannelRingBuffer | null
+  onSelectTap: (tapName: string) => void
+  selectedTap: string
 }
 
-export function FFTView({ buffer }: FFTViewProps) {
+export function FFTView({ buffer, onSelectTap, selectedTap }: FFTViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sizeRef = useRef({ w: 0, h: 0 })
@@ -181,9 +184,7 @@ export function FFTView({ buffer }: FFTViewProps) {
   return (
     <div ref={containerRef} className="flex-1 relative min-h-0">
       {!buffer ? (
-        <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
-          Waiting for data...
-        </div>
+        <StreamEmptyState onSelectTap={onSelectTap} selectedTap={selectedTap} />
       ) : (
         <>
           <canvas ref={canvasRef} className="block" />

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react"
 import type { ChannelRingBuffer } from "../../lib/ringBuffer"
+import { StreamEmptyState } from "./StreamEmptyState"
 
 const CHANNEL_COLORS = [
   "#3b82f6", "#ef4444", "#22c55e", "#f59e0b",
@@ -8,9 +9,11 @@ const CHANNEL_COLORS = [
 
 interface WaveformViewProps {
   buffer: ChannelRingBuffer | null
+  onSelectTap: (tapName: string) => void
+  selectedTap: string
 }
 
-export function WaveformView({ buffer }: WaveformViewProps) {
+export function WaveformView({ buffer, onSelectTap, selectedTap }: WaveformViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sizeRef = useRef({ w: 0, h: 0 })
@@ -117,9 +120,7 @@ export function WaveformView({ buffer }: WaveformViewProps) {
   return (
     <div ref={containerRef} className="flex-1 relative min-h-0">
       {!buffer ? (
-        <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
-          Waiting for data...
-        </div>
+        <StreamEmptyState onSelectTap={onSelectTap} selectedTap={selectedTap} />
       ) : (
         <canvas ref={canvasRef} className="block" />
       )}

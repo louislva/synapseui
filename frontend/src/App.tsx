@@ -248,15 +248,20 @@ function App() {
             </Tooltip>
           </TooltipProvider>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setStreamOpen(!streamOpen)}
-            className={streamOpen ? "bg-muted" : "text-muted-foreground"}
-          >
-            <Radio className="size-3.5" />
-            Stream
-          </Button>
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setStreamOpen(!streamOpen)}
+              className={streamOpen ? "bg-muted" : "text-muted-foreground"}
+            >
+              <Radio className="size-3.5" />
+              Stream
+            </Button>
+            {isRunning && !streamOpen && (
+              <StreamHint onOpenStream={() => setStreamOpen(true)} />
+            )}
+          </div>
 
           <div className="flex-1" />
 
@@ -289,9 +294,6 @@ function App() {
               <NodeEditor />
               {activeConfigId && !selectedUri && (
                 <DeviceHint onOpenDevices={() => setDevicesOpen(true)} />
-              )}
-              {isRunning && !streamOpen && (
-                <StreamHint onOpenStream={() => setStreamOpen(true)} />
               )}
             </div>
             {streamOpen && (

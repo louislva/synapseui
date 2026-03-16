@@ -341,11 +341,11 @@ export function StreamPanel({ onClose }: { onClose: () => void }) {
       {viewMode === "text" ? (
         <TextLog messages={messages} selectedUri={selectedUri} />
       ) : viewMode === "heatmap" ? (
-        <HeatmapView buffer={bufferRef.current} />
+        <HeatmapView buffer={bufferRef.current} onSelectTap={handleSelectTap} selectedTap={selectedTap} />
       ) : viewMode === "waveform" ? (
-        <WaveformView buffer={bufferRef.current} />
+        <WaveformView buffer={bufferRef.current} onSelectTap={handleSelectTap} selectedTap={selectedTap} />
       ) : (
-        <FFTView buffer={bufferRef.current} />
+        <FFTView buffer={bufferRef.current} onSelectTap={handleSelectTap} selectedTap={selectedTap} />
       )}
     </div>
   )

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react"
 import type { ChannelRingBuffer } from "../../lib/ringBuffer"
+import { StreamEmptyState } from "./StreamEmptyState"
 
 // Viridis-like colormap LUT (256 entries, RGB 0-255)
 const COLORMAP = buildColormap()
@@ -29,9 +30,11 @@ function buildColormap(): Uint8Array {
 
 interface HeatmapViewProps {
   buffer: ChannelRingBuffer | null
+  onSelectTap: (tapName: string) => void
+  selectedTap: string
 }
 
-export function HeatmapView({ buffer }: HeatmapViewProps) {
+export function HeatmapView({ buffer, onSelectTap, selectedTap }: HeatmapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sizeRef = useRef({ w: 0, h: 0 })
@@ -116,9 +119,7 @@ export function HeatmapView({ buffer }: HeatmapViewProps) {
   return (
     <div ref={containerRef} className="flex-1 relative min-h-0">
       {!buffer ? (
-        <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
-          Waiting for data...
-        </div>
+        <StreamEmptyState onSelectTap={onSelectTap} selectedTap={selectedTap} />
       ) : (
         <canvas ref={canvasRef} className="block" />
       )}
