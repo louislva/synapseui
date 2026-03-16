@@ -27,6 +27,15 @@ export function configHash(
   nodes: Node<NodeData>[],
   edges: Edge[],
 ): string {
-  const payload = serializeGraph(nodes, edges)
-  return JSON.stringify(payload)
+  // Use stable indices instead of random UUIDs so the hash survives
+  // localStorage round-trips where node IDs are regenerated.
+  const idToIndex = new Map(nodes.map((n, i) => [n.id, i]))
+  const stable = {
+    nodes: nodes.map((n) => ({ type: n.data.type, params: n.data.params })),
+    connections: edges.map((e) => ({
+      from: idToIndex.get(e.source),
+      to: idToIndex.get(e.target),
+    })),
+  }
+  return JSON.stringify(stable)
 }

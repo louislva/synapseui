@@ -58,8 +58,6 @@ class ConfigureRequest(BaseModel):
     connections: list[ConnectionPayload]
 
 
-from synapse.client.nodes.spike_detector import ThresholderConfig
-
 def _make_broadband_source(p: dict):
     num_channels = int(p.get("num_channels", 8))
     channels = [
@@ -81,6 +79,26 @@ def _make_broadband_source(p: dict):
     )
 
 
+def _make_spike_source(p: dict):
+    num_channels = int(p.get("num_channels", 8))
+    channels = [
+        syn.Channel(id=ch, electrode_id=ch * 2, reference_id=ch * 2 + 1)
+        for ch in range(num_channels)
+    ]
+    return syn.SpikeSource(
+        peripheral_id=0,
+        sample_rate_hz=int(p.get("sample_rate_hz", 30000)),
+        spike_window_ms=float(p.get("spike_window_ms", 20)),
+        gain=1.0,
+        threshold_uV=float(p.get("threshold_uV", 50)),
+        electrodes=syn.ElectrodeConfig(
+            channels=channels,
+            low_cutoff_hz=300.0,
+            high_cutoff_hz=6000.0,
+        ),
+    )
+
+
 _NODE_FACTORIES = {
     "broadband_source": _make_broadband_source,
     "spectral_filter": lambda p: syn.SpectralFilter(
@@ -88,11 +106,13 @@ _NODE_FACTORIES = {
         low_cutoff_hz=float(p.get("low_cutoff_hz", 300)),
         high_cutoff_hz=float(p.get("high_cutoff_hz", 3000)),
     ),
-    "spike_detector": lambda p: syn.SpikeDetector(
-        samples_per_spike=48,
-        config=ThresholderConfig(
-            threshold_uV=int(p.get("threshold_sigma", 4)),
-        ),
+    "spike_source": _make_spike_source,
+    "optical_stimulation": lambda p: syn.OpticalStimulation(
+        peripheral_id=0,
+        pixel_mask=[],
+        bit_width=int(p.get("bit_width", 8)),
+        frame_rate=int(p.get("frame_rate", 30)),
+        gain=float(p.get("gain", 1.0)),
     ),
 }
 

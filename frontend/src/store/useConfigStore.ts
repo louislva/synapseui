@@ -107,15 +107,24 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   },
 
   setActiveConfig: (id) => {
-    // Auto-save current config before switching
-    const { activeConfigId } = get()
-    if (activeConfigId) {
-      get().saveActiveConfig()
-    }
-
     const config = get().configs.find((c) => c.id === id)
     if (!config) return
     set({ activeConfigId: id })
     useGraphStore.getState().loadGraph(config.nodes, config.edges)
   },
 }))
+
+// Auto-save: persist the active config whenever the graph changes.
+let _saveTimer: ReturnType<typeof setTimeout> | null = null
+
+useGraphStore.subscribe((state, prev) => {
+  if (state.nodes === prev.nodes && state.edges === prev.edges) return
+  const { activeConfigId } = useConfigStore.getState()
+  if (!activeConfigId) return
+
+  // Debounce to avoid thrashing localStorage during drags
+  if (_saveTimer) clearTimeout(_saveTimer)
+  _saveTimer = setTimeout(() => {
+    useConfigStore.getState().saveActiveConfig()
+  }, 500)
+})

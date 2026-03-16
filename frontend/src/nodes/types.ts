@@ -23,7 +23,7 @@ export interface ParamDef {
 export interface NodeTypeDef {
   type: string
   label: string
-  category: "Sources" | "Filters" | "Detectors"
+  category: "Sources" | "Filters" | "Stimulation"
   ports: PortDef[]
   params: ParamDef[]
   color: string
@@ -112,35 +112,81 @@ export const NODE_TYPE_DEFS: Record<string, NodeTypeDef> = {
       },
     ],
   },
-  spike_detector: {
-    type: "spike_detector",
-    label: "Spike Detector",
-    category: "Detectors",
+  spike_source: {
+    type: "spike_source",
+    label: "Spike Source",
+    category: "Sources",
     color: "#f97316",
-    ports: [
-      { id: "in", label: "In", direction: "input" },
-      { id: "out", label: "Out", direction: "output" },
-    ],
+    ports: [{ id: "out", label: "Out", direction: "output" }],
     params: [
       {
-        key: "threshold_sigma",
-        label: "Threshold",
+        key: "sample_rate_hz",
+        label: "Sample Rate",
         type: "number",
-        default: 4,
-        min: 1,
-        max: 20,
-        step: 0.5,
-        unit: "σ",
+        default: 30000,
+        min: 1000,
+        max: 100000,
+        step: 1000,
+        unit: "Hz",
       },
       {
-        key: "dead_time_ms",
-        label: "Dead Time",
+        key: "spike_window_ms",
+        label: "Spike Window",
         type: "number",
-        default: 1,
-        min: 0,
-        max: 10,
-        step: 0.1,
+        default: 20,
+        min: 1,
+        max: 100,
+        step: 1,
         unit: "ms",
+      },
+      {
+        key: "threshold_uV",
+        label: "Threshold",
+        type: "number",
+        default: 50,
+        min: 1,
+        max: 500,
+        step: 1,
+        unit: "μV",
+      },
+    ],
+  },
+  optical_stimulation: {
+    type: "optical_stimulation",
+    label: "Optical Stimulation",
+    category: "Stimulation",
+    color: "#22c55e",
+    ports: [{ id: "in", label: "In", direction: "input" }],
+    params: [
+      {
+        key: "bit_width",
+        label: "Bit Width",
+        type: "select",
+        default: 8,
+        options: [
+          { label: "8-bit", value: 8 },
+          { label: "10-bit", value: 10 },
+          { label: "12-bit", value: 12 },
+        ],
+      },
+      {
+        key: "frame_rate",
+        label: "Frame Rate",
+        type: "number",
+        default: 30,
+        min: 1,
+        max: 120,
+        step: 1,
+        unit: "Hz",
+      },
+      {
+        key: "gain",
+        label: "Gain",
+        type: "number",
+        default: 1.0,
+        min: 0.1,
+        max: 10.0,
+        step: 0.1,
       },
     ],
   },

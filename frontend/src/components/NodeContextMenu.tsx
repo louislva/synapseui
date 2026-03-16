@@ -9,7 +9,7 @@ interface CanvasMenuProps {
   onClose: () => void
 }
 
-const categories = ["Sources", "Filters", "Detectors"] as const
+const categories = ["Sources", "Filters", "Stimulation"] as const
 
 export function CanvasContextMenu({
   x,
