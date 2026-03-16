@@ -47,16 +47,7 @@ export const NODE_TYPE_DEFS: Record<string, NodeTypeDef> = {
         step: 1000,
         unit: "Hz",
       },
-      {
-        key: "num_channels",
-        label: "Channels",
-        type: "number",
-        default: 8,
-        min: 1,
-        max: 256,
-        step: 1,
-      },
-      {
+{
         key: "bit_depth",
         label: "Bit Depth",
         type: "select",

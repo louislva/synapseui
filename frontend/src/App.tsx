@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import { ReactFlowProvider } from "@xyflow/react"
 import {
   ChevronDown,
@@ -51,7 +51,7 @@ function App() {
   const selectedDevice = devices.find((d) => d.uri === selectedUri)
   const isRunning = selectedDevice?.status === "Running"
 
-  const currentHash = configHash(nodes, edges)
+  const currentHash = useMemo(() => configHash(nodes, edges), [nodes, edges])
   const isDeployed =
     selectedUri != null && deployedHashes[selectedUri] === currentHash
   const canDeploy =
