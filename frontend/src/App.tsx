@@ -21,7 +21,7 @@ import { DevicesSidebar } from "./components/DevicesSidebar"
 import { DeviceDropdown } from "./components/DeviceDropdown"
 import { ParameterPanel } from "./components/ParameterPanel"
 import { StreamPanel } from "./components/StreamPanel"
-import { OnboardingOverlay, useOnboarding } from "./components/OnboardingOverlay"
+import { OnboardingStep, OnboardingModal, useOnboarding } from "./components/OnboardingOverlay"
 import { DeviceHint } from "./components/DeviceHint"
 import { StreamHint } from "./components/StreamHint"
 import { serializeGraph, configHash } from "./lib/serialize"
@@ -34,7 +34,7 @@ import {
 } from "./components/ui/tooltip"
 
 function App() {
-  const { showOnboarding, dismissOnboarding } = useOnboarding()
+  useOnboarding() // initialize onboarding state
   const [configsOpen, setConfigsOpen] = useState(true)
   const [devicesOpen, setDevicesOpen] = useState(false)
   const [streamOpen, setStreamOpen] = useState(false)
@@ -265,15 +265,18 @@ function App() {
 
           <div className="flex-1" />
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setDevicesOpen(!devicesOpen)}
-            className={devicesOpen ? "bg-muted" : "text-muted-foreground"}
-          >
-            <Cpu className="size-3.5" />
-            Devices
-          </Button>
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDevicesOpen(!devicesOpen)}
+              className={devicesOpen ? "bg-muted" : "text-muted-foreground"}
+            >
+              <Cpu className="size-3.5" />
+              Devices
+            </Button>
+            <OnboardingStep target="devices" onOpenSidebar={() => setDevicesOpen(true)} />
+          </div>
         </div>
 
         {/* Error banner */}
@@ -312,13 +315,7 @@ function App() {
           )}
         </div>
       </div>
-      {showOnboarding && (
-        <OnboardingOverlay
-          onOpenConfigs={() => setConfigsOpen(true)}
-          onOpenDevices={() => setDevicesOpen(true)}
-          onDismiss={dismissOnboarding}
-        />
-      )}
+      <OnboardingModal />
     </ReactFlowProvider>
   )
 }

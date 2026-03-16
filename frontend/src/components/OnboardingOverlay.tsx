@@ -1,155 +1,340 @@
-import { useState, useEffect, useCallback } from "react"
-import { ArrowLeft, ArrowRight, Cpu, FileSliders, X } from "lucide-react"
+import { useState, useEffect, type RefObject } from "react"
+import { createPortal } from "react-dom"
+import { X } from "lucide-react"
 import { Button } from "./ui/button"
 
 const STORAGE_KEY = "synapseui-onboarding-done"
 
-interface OnboardingOverlayProps {
-  onOpenConfigs: () => void
-  onOpenDevices: () => void
-  onDismiss: () => void
-}
-
 const steps = [
   {
     title: "Welcome to SynapseUI",
-    body: "SynapseUI is a visual editor for building and deploying signal chain configurations to Synapse devices. Design processing pipelines by connecting nodes on a canvas, then deploy them to hardware or simulators.",
-    highlight: null as string | null,
+    body: "Design signal chain configs by connecting nodes on the canvas, then deploy them to hardware or simulators.",
+    target: "center" as const,
   },
   {
     title: "Create a Config",
-    body: "Start by creating a signal chain config. Open the Configs sidebar and click the + button to create your first config. Then right-click the canvas or use the + button to add nodes.",
-    highlight: "configs",
+    body: "Click + to create your first config. Then right-click the canvas to add nodes.",
+    target: "configs-plus" as const,
   },
   {
     title: "Connect a Device",
-    body: "Open the Devices panel to discover hardware on your network or launch a simulator. Once a device appears, select it from the toolbar dropdown, then deploy your config.",
-    highlight: "devices",
+    body: "Open the Devices panel to discover hardware on your network or launch a simulator. Then select it from the toolbar dropdown and deploy.",
+    target: "devices" as const,
   },
 ]
 
-export function OnboardingOverlay({
-  onOpenConfigs,
-  onOpenDevices,
+export type OnboardingTarget = "center" | "configs" | "configs-plus" | "devices"
+
+/* ── Shared step controls ── */
+
+function StepControls({
+  step,
+  totalSteps,
+  onNext,
+  onBack,
   onDismiss,
-}: OnboardingOverlayProps) {
-  const [step, setStep] = useState(0)
-  const current = steps[step]
-
-  const finish = useCallback(() => {
-    localStorage.setItem(STORAGE_KEY, "1")
-    onDismiss()
-  }, [onDismiss])
-
-  // Open relevant sidebar on step change
-  useEffect(() => {
-    if (current.highlight === "configs") onOpenConfigs()
-    if (current.highlight === "devices") onOpenDevices()
-  }, [step, current.highlight, onOpenConfigs, onOpenDevices])
-
+}: {
+  step: number
+  totalSteps: number
+  onNext: () => void
+  onBack: () => void
+  onDismiss: () => void
+}) {
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50" onClick={finish} />
+    <>
+      {/* Step indicator */}
+      <div className="flex items-center gap-1.5 mb-3">
+        {Array.from({ length: totalSteps }, (_, i) => (
+          <div
+            key={i}
+            className={`h-1 rounded-full transition-all ${
+              i === step
+                ? "w-5 bg-primary"
+                : i < step
+                  ? "w-2.5 bg-primary/40"
+                  : "w-2.5 bg-muted"
+            }`}
+          />
+        ))}
+      </div>
+    </>
+  )
+}
 
-      {/* Card */}
-      <div className="relative z-10 w-full max-w-md rounded-xl border border-border bg-popover p-6 shadow-2xl mx-4">
-        {/* Close */}
-        <button
-          onClick={finish}
-          className="absolute top-3 right-3 text-muted-foreground hover:text-foreground cursor-pointer"
-        >
-          <X className="size-4" />
-        </button>
-
-        {/* Step indicator */}
-        <div className="flex items-center gap-1.5 mb-4">
-          {steps.map((_, i) => (
-            <div
-              key={i}
-              className={`h-1 rounded-full transition-all ${
-                i === step
-                  ? "w-6 bg-primary"
-                  : i < step
-                    ? "w-3 bg-primary/40"
-                    : "w-3 bg-muted"
-              }`}
-            />
-          ))}
-        </div>
-
-        {/* Highlight icon */}
-        {current.highlight === "configs" && (
-          <div className="flex items-center gap-2 mb-3 text-muted-foreground">
-            <div className="flex items-center gap-1 rounded-md border border-ring bg-muted px-2 py-1 text-xs font-medium text-foreground">
-              <FileSliders className="size-3" />
-              Configs
-            </div>
-            <ArrowLeft className="size-3.5 animate-pulse" />
-            <span className="text-xs">in the toolbar</span>
-          </div>
-        )}
-        {current.highlight === "devices" && (
-          <div className="flex items-center gap-2 mb-3 text-muted-foreground">
-            <span className="text-xs">in the toolbar</span>
-            <ArrowRight className="size-3.5 animate-pulse" />
-            <div className="flex items-center gap-1 rounded-md border border-ring bg-muted px-2 py-1 text-xs font-medium text-foreground">
-              <Cpu className="size-3" />
-              Devices
-            </div>
-          </div>
-        )}
-
-        {/* Content */}
-        <h2 className="text-lg font-semibold mb-2">{current.title}</h2>
-        <p className="text-sm text-muted-foreground leading-relaxed mb-6">
-          {current.body}
-        </p>
-
-        {/* Actions */}
-        <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={finish}
-            className="text-muted-foreground"
-          >
-            Skip
+function StepActions({
+  step,
+  totalSteps,
+  onNext,
+  onBack,
+  onDismiss,
+}: {
+  step: number
+  totalSteps: number
+  onNext: () => void
+  onBack: () => void
+  onDismiss: () => void
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <Button
+        variant="ghost"
+        size="xs"
+        onClick={onDismiss}
+        className="text-muted-foreground"
+      >
+        Skip
+      </Button>
+      <div className="flex gap-1.5">
+        {step > 0 && (
+          <Button variant="outline" size="xs" onClick={onBack}>
+            Back
           </Button>
-          <div className="flex gap-2">
-            {step > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setStep(step - 1)}
-              >
-                Back
-              </Button>
-            )}
-            {step < steps.length - 1 ? (
-              <Button size="sm" onClick={() => setStep(step + 1)}>
-                Next
-              </Button>
-            ) : (
-              <Button size="sm" onClick={finish}>
-                Get Started
-              </Button>
-            )}
-          </div>
-        </div>
+        )}
+        {step < totalSteps - 1 ? (
+          <Button size="xs" onClick={onNext}>
+            Next
+          </Button>
+        ) : (
+          <Button size="xs" onClick={onDismiss}>
+            Get Started
+          </Button>
+        )}
       </div>
     </div>
   )
 }
 
-export function useOnboarding() {
-  const [show, setShow] = useState(false)
+/* ── Center modal (step 0) ── */
+
+export function OnboardingModal() {
+  const { step, setStep, dismiss, show } = useOnboardingState()
+
+  if (!show) return null
+  const current = steps[step]
+  if (current.target !== "center") return null
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={dismiss} />
+      <div className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-popover p-5 shadow-2xl mx-4 animate-in fade-in zoom-in-95 duration-200">
+        <button
+          onClick={dismiss}
+          className="absolute top-3 right-3 text-muted-foreground hover:text-foreground cursor-pointer"
+        >
+          <X className="size-4" />
+        </button>
+
+        <StepControls
+          step={step}
+          totalSteps={steps.length}
+          onNext={() => setStep(step + 1)}
+          onBack={() => setStep(step - 1)}
+          onDismiss={dismiss}
+        />
+
+        <h2 className="text-lg font-semibold mb-2 pr-4">{current.title}</h2>
+        <p className="text-sm text-muted-foreground leading-relaxed mb-5">
+          {current.body}
+        </p>
+
+        <StepActions
+          step={step}
+          totalSteps={steps.length}
+          onNext={() => setStep(step + 1)}
+          onBack={() => setStep(step - 1)}
+          onDismiss={dismiss}
+        />
+      </div>
+    </div>
+  )
+}
+
+/* ── Popover (steps 1+) ── */
+
+interface OnboardingStepProps {
+  target: OnboardingTarget
+  onOpenSidebar: () => void
+}
+
+export function OnboardingStep({ target, onOpenSidebar }: OnboardingStepProps) {
+  const { step, setStep, dismiss, show } = useOnboardingState()
 
   useEffect(() => {
-    if (!localStorage.getItem(STORAGE_KEY)) {
-      setShow(true)
+    if (show && steps[step].target === target) {
+      onOpenSidebar()
     }
+  }, [show, step, target, onOpenSidebar])
+
+  if (!show) return null
+
+  const current = steps[step]
+  if (current.target !== target) return null
+
+  const side = target === "devices" ? "right" : "left"
+
+  return (
+    <div
+      className={`absolute top-full mt-2 z-[100] animate-in fade-in slide-in-from-top-2 duration-300 ${
+        side === "left" ? "left-0" : "right-0"
+      }`}
+    >
+      <div className="relative rounded-lg border border-border bg-popover px-4 py-3 shadow-lg w-72">
+        {/* Arrow */}
+        <div
+          className={`absolute -top-[6px] size-3 rotate-45 border-l border-t border-border bg-popover ${
+            side === "left" ? "left-4" : "right-4"
+          }`}
+        />
+
+        {/* Close */}
+        <button
+          onClick={dismiss}
+          className="absolute top-2.5 right-2.5 text-muted-foreground hover:text-foreground cursor-pointer"
+        >
+          <X className="size-3.5" />
+        </button>
+
+        <StepControls
+          step={step}
+          totalSteps={steps.length}
+          onNext={() => setStep(step + 1)}
+          onBack={() => setStep(step - 1)}
+          onDismiss={dismiss}
+        />
+
+        <h3 className="text-sm font-semibold mb-1 pr-4">{current.title}</h3>
+        <p className="text-xs text-muted-foreground leading-relaxed mb-3">
+          {current.body}
+        </p>
+
+        <StepActions
+          step={step}
+          totalSteps={steps.length}
+          onNext={() => setStep(step + 1)}
+          onBack={() => setStep(step - 1)}
+          onDismiss={dismiss}
+        />
+      </div>
+    </div>
+  )
+}
+
+/* ── Portal-based popover (for elements inside overflow containers) ── */
+
+interface OnboardingPortalStepProps {
+  target: OnboardingTarget
+  anchorRef: RefObject<HTMLElement | null>
+}
+
+export function OnboardingPortalStep({ target, anchorRef }: OnboardingPortalStepProps) {
+  const { step, setStep, dismiss, show } = useOnboardingState()
+  const [pos, setPos] = useState<{ top: number; anchorCenter: number } | null>(null)
+
+  useEffect(() => {
+    if (!show || steps[step].target !== target || !anchorRef.current) {
+      setPos(null)
+      return
+    }
+    const update = () => {
+      const rect = anchorRef.current?.getBoundingClientRect()
+      if (rect) {
+        setPos({ top: rect.bottom + 8, anchorCenter: rect.left + rect.width / 2 })
+      }
+    }
+    update()
+    window.addEventListener("resize", update)
+    return () => window.removeEventListener("resize", update)
+  }, [show, step, target, anchorRef])
+
+  if (!show || !pos) return null
+  const current = steps[step]
+  if (current.target !== target) return null
+
+  const stepProps = {
+    step,
+    totalSteps: steps.length,
+    onNext: () => setStep(step + 1),
+    onBack: () => setStep(step - 1),
+    onDismiss: dismiss,
+  }
+
+  // Position popover so the arrow (at left: 22px center) aligns with the anchor center
+  const arrowOffset = 22 // arrow left-4 (16px) + half arrow size (6px)
+  const popoverLeft = pos.anchorCenter - arrowOffset
+
+  return createPortal(
+    <div
+      className="fixed z-[100] animate-in fade-in slide-in-from-top-2 duration-300"
+      style={{ top: pos.top, left: popoverLeft }}
+    >
+      <div className="relative rounded-lg border border-border bg-popover px-4 py-3 shadow-lg w-72">
+        <div className="absolute -top-[6px] left-4 size-3 rotate-45 border-l border-t border-border bg-popover" />
+
+        <button
+          onClick={dismiss}
+          className="absolute top-2.5 right-2.5 text-muted-foreground hover:text-foreground cursor-pointer"
+        >
+          <X className="size-3.5" />
+        </button>
+
+        <StepControls {...stepProps} />
+        <h3 className="text-sm font-semibold mb-1 pr-4">{current.title}</h3>
+        <p className="text-xs text-muted-foreground leading-relaxed mb-3">{current.body}</p>
+        <StepActions {...stepProps} />
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+/* ── Shared state ── */
+
+let _step = 0
+let _show = false
+let _initialized = false
+const _listeners = new Set<() => void>()
+
+function notify() {
+  _listeners.forEach((fn) => fn())
+}
+
+function useOnboardingState() {
+  const [, rerender] = useState(0)
+
+  useEffect(() => {
+    const fn = () => rerender((n) => n + 1)
+    _listeners.add(fn)
+    return () => { _listeners.delete(fn) }
   }, [])
 
-  return { showOnboarding: show, dismissOnboarding: () => setShow(false) }
+  return {
+    step: _step,
+    show: _show,
+    setStep: (s: number) => { _step = s; notify() },
+    dismiss: () => {
+      localStorage.setItem(STORAGE_KEY, "1")
+      _show = false
+      notify()
+    },
+  }
+}
+
+export function useOnboarding() {
+  const [, rerender] = useState(0)
+
+  useEffect(() => {
+    if (!_initialized) {
+      _initialized = true
+      if (!localStorage.getItem(STORAGE_KEY)) {
+        _show = true
+        _step = 0
+      }
+    }
+    const fn = () => rerender((n) => n + 1)
+    _listeners.add(fn)
+    notify()
+    return () => { _listeners.delete(fn) }
+  }, [])
+
+  return { showOnboarding: _show }
 }

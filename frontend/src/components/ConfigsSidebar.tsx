@@ -1,7 +1,8 @@
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { Info, Plus, Copy, Trash2, Check, X } from "lucide-react"
 import { useConfigStore } from "../store/useConfigStore"
 import { Button } from "./ui/button"
+import { OnboardingPortalStep } from "./OnboardingOverlay"
 import {
   Tooltip,
   TooltipContent,
@@ -14,6 +15,7 @@ export function ConfigsSidebar() {
     useConfigStore()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState("")
+  const plusRef = useRef<HTMLButtonElement>(null)
 
   const startRename = (id: string, currentName: string) => {
     setEditingId(id)
@@ -44,12 +46,14 @@ export function ConfigsSidebar() {
           </TooltipProvider>
         </h2>
         <Button
+          ref={plusRef}
           variant="ghost"
           size="icon-xs"
           onClick={() => createConfig()}
         >
           <Plus className="size-3.5" />
         </Button>
+        <OnboardingPortalStep target="configs-plus" anchorRef={plusRef} />
       </div>
 
       {configs.length === 0 && (
