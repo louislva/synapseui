@@ -29,3 +29,27 @@ frontend/
 ├── tsconfig.node.json  # Node/Vite TS config
 └── eslint.config.js    # ESLint flat config
 ```
+
+## Backend
+
+- **Location:** `backend/`
+- **Stack:** Python 3.10+, FastAPI, Uvicorn
+- **Package manager:** uv
+- **Dependencies:** `fastapi`, `uvicorn[standard]`, `science-synapse`
+
+### Commands
+
+- `uv run uvicorn main:app --reload` — Start dev server (from `backend/`)
+- `uv sync` — Install dependencies
+
+### API Endpoints
+
+- `GET /api/devices` — Discover and return available Synapse devices
+
+### Project Structure
+
+```
+backend/
+├── main.py          # FastAPI app with device discovery endpoint
+└── pyproject.toml   # Project config and dependencies
+```
