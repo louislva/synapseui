@@ -2,6 +2,7 @@ import { Handle, Position, useEdges, useNodes, type Node, type NodeProps } from 
 import { AlertTriangle, Radio } from "lucide-react"
 import { NODE_TYPE_DEFS, type NodeData } from "./types"
 import { useDeviceStore } from "../store/useDeviceStore"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../components/ui/tooltip"
 
 /** Normalize a string for fuzzy matching: lowercase, strip underscores/spaces */
 function normalize(s: string): string {
@@ -18,7 +19,7 @@ export function BaseNode({ data, id, selected }: NodeProps & { data: NodeData })
   if (!def) return null
 
   // Check for Nyquist violations on spectral filter nodes
-  let hasNyquistWarning = false
+  let nyquistTooltip = ""
   if (data.type === "spectral_filter") {
     const inEdge = allEdges.find((e) => e.target === id)
     if (inEdge) {
@@ -29,11 +30,15 @@ export function BaseNode({ data, id, selected }: NodeProps & { data: NodeData })
         const method = data.params["method"]
         const low = data.params["low_cutoff_hz"] as number
         const high = data.params["high_cutoff_hz"] as number
+        const issues: string[] = []
         if ((method === "kLowPass" || method === "kBandPass" || method === "kBandStop") && high >= nyquist) {
-          hasNyquistWarning = true
+          issues.push(`High cutoff (${high} Hz) ≥ Nyquist (${nyquist} Hz)`)
         }
         if ((method === "kHighPass" || method === "kBandPass" || method === "kBandStop") && low >= nyquist) {
-          hasNyquistWarning = true
+          issues.push(`Low cutoff (${low} Hz) ≥ Nyquist (${nyquist} Hz)`)
+        }
+        if (issues.length) {
+          nyquistTooltip = issues.join("\n")
         }
       }
     }
@@ -63,8 +68,17 @@ export function BaseNode({ data, id, selected }: NodeProps & { data: NodeData })
         style={{ backgroundColor: def.color }}
       >
         {data.label}
-        {hasNyquistWarning && (
-          <AlertTriangle className="size-3.5 text-amber-200" />
+        {nyquistTooltip && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>
+                <AlertTriangle className="size-3.5 text-amber-200" />
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {nyquistTooltip}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </div>
 
