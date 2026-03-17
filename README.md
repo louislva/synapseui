@@ -8,6 +8,8 @@ SynapseUI makes it easy to get started with Synapse by letting you spin up simul
 
 ## Demo
 
+[![Watch the demo](https://img.youtube.com/vi/Uqrw9SGAdx4/maxresdefault.jpg)](https://youtu.be/Uqrw9SGAdx4)
+
 Try it out at [synapseui.louisarge.com](https://synapseui.louisarge.com/) — note that since it's running on a remote server, it won't be able to discover devices on your local network.
 
 ## Features
